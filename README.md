@@ -1,7 +1,7 @@
 # GObjectify
 A type-safe, declarative TypeScript library for writing & interacting with GObject classes in GNOME JavaScript (GJS).
 
-GObjectify is a TypeScript library for GJS designed to dramatically improve the developer experience when working with GObject, Gtk, and Gio.
+GObjectify is a TypeScript library for GJS designed to dramatically improve the developer experience when working with GObject.
 
 It provides:
 - **Strong type safety**: GObject properties, template children, signals, actions, and interfaces are all fully typed
@@ -20,6 +20,8 @@ Writing GObject subclasses in plain GJS, or plain GJS with TS, is very verbose a
 - Template children need correct naming and TS-aware syntax
 - Boilerplate `registerClass` code grows quickly, and pollutes simple class files
 - Signals must be defined as object literals with deeply nested structures
+- Constructors are entirely untyped despite their very complex and strict behavior in GObject
+- Constant and Construct-Only flagged properties aren't enforced as readonly in TS
 
 GObjectify fixes all of this! With a single declarative descriptor, you define properties, template children, simple actions, and implemented interfaces, all automatically typed and wired into the GObject system.
 
