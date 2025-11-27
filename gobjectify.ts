@@ -565,7 +565,13 @@ function OnSignal(signal_name: string) {
  */
 function OnSimpleAction<
 	T extends GObject.Object,
-	K extends { [Key in keyof T]: T[Key] extends Gio.SimpleAction ? Key : never }[keyof T],
+	K extends {
+		[Key in keyof T]: Key extends "with_implements"
+			? never
+			: T[Key] extends Gio.SimpleAction
+				? Key
+				: never
+	}[keyof T],
 	U extends (
 		| ((this: T)=> any)
 		| ((this: T, action: Gio.SimpleAction)=> any)
