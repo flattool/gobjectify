@@ -25,7 +25,7 @@ Writing GObject subclasses in plain GJS, or plain GJS with TS, is very verbose a
 
 GObjectify fixes all of this! With a single declarative descriptor, you define properties, template children, simple actions, and implemented interfaces, all automatically typed and wired into the GObject system.
 
-GObjectify acts as a thin, typesafe layer over GObject—not a framework—so everything remains 100% compatible with GJS, GTK, and GNOME platform APIs.
+GObjectify acts as a thin, typesafe layer over GObject, not a framework, so everything remains 100% compatible with GJS, GTK, and GNOME platform APIs.
 
 Here is an example:
 ```ts
@@ -33,7 +33,7 @@ Here is an example:
 @Signal("some-signal")
 export class MyWidget extends from(Gtk.Box, {
   _button: Child(Gtk.Button),
-  title: Property("string", { default: "Hello" }),
+  title: Property.string({ default: "Hello" }),
   click: SimpleAction(),
 }) {
   _ready(): void {
@@ -123,7 +123,7 @@ import { from, Property, Child, SimpleAction } from "./gobjectify/gobjectify.js"
 
 const Base = from(Gtk.Box, {
   _button: Child(Gtk.Button),
-  title: Property("string", { default: "My Widget" }),
+  title: Property.string({ default: "My Widget" }),
   activate: SimpleAction(),
 })
 ```
@@ -168,7 +168,7 @@ GObjectify automatically:
 ```ts
 @GClass({ template: "resource:///org/example/ui/my_widget.ui" })
 export class MainWindow extends from(Gtk.ApplicationWindow, {
-  count: Property("uint32"),
+  count: Property.uint32(),
   _increment_btn: Child(Gtk.Button),
   _decrement_btn: Child(Gtk.Button),
   _count_lbl: Child(Gtk.Label),
