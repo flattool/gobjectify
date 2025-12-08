@@ -41,7 +41,31 @@ type PropertyDescriptor<ValueType, Flags extends ParamFlagStrings> = {
 	create(name: string): GObject.ParamSpec,
 }
 
+type __NoArg = typeof noArgSentinel
+declare const noArgSentinel: unique symbol
+
 type Castable<WideType, Config extends DefaultableConfig<WideType>> = {
+	/**
+	 * Type helper to allow narrowing of property descriptors' types
+	 *
+	 * @template NarrowType The type used to narrow
+	 *
+	 * @example
+	 * ```ts
+	 * as<"yes" | "no">() // Generic argument is REQUIRED
+	 * ```
+	 */
+	as(): [never] & void,
+	/**
+	 * Type helper to allow narrowing of property descriptors' types
+	 *
+	 * @template NarrowType The type used to narrow
+	 *
+	 * @example
+	 * ```ts
+	 * as<"yes" | "no">() // Generic argument is REQUIRED
+	 * ```
+	 */
 	as<NarrowType extends WideType>(): Config extends { default: infer D }
 		? D extends NarrowType
 			? PropertyDescriptor<NarrowType, FlagsFrom<Config>>
@@ -225,7 +249,30 @@ const bool = <const C extends BoolConfig>(
 const gobject = <G extends GClass, C extends BaseConfig>(kind: G, config?: C): PropertyDescriptor<
 	InstanceType<G> | null,
 	FlagsFrom<C>
-> & { as<NarrowType extends InstanceType<G>>(): PropertyDescriptor<NarrowType | null, FlagsFrom<C>> } => {
+> & {
+	/**
+	 * Type helper to allow narrowing of property descriptors' types
+	 *
+	 * @template NarrowType The type used to narrow
+	 *
+	 * @example
+	 * ```ts
+	 * as<Gtk.Label | Gtk.Box>() // Generic argument is REQUIRED
+	 * ```
+	 */
+	as(): [never] & void,
+	/**
+	 * Type helper to allow narrowing of property descriptors' types
+	 *
+	 * @template NarrowType The type used to narrow
+	 *
+	 * @example
+	 * ```ts
+	 * as<Gtk.Label | Gtk.Box>() // Generic argument is REQUIRED
+	 * ```
+	 */
+	as<NarrowType extends InstanceType<G>>(): PropertyDescriptor<NarrowType | null, FlagsFrom<C>>,
+} => {
 	const nick: string | null = config?.nick || null
 	const blurb: string | null = config?.blurb || null
 	const flags: GObject.ParamFlags = get_flags(config?.flags ?? "READWRITE")
@@ -285,6 +332,27 @@ const genum = <G extends number, C extends DefaultableConfig<G>>(
  * - `"CONSTRUCT_ONLY"` -> `READWRITE | CONSTRUCT_ONLY`
  */
 const jsobject = <C extends BaseConfig>(config?: C): PropertyDescriptor<{} | null, FlagsFrom<C>> & {
+	/**
+	 * Type helper to allow narrowing of property descriptors' types
+	 *
+	 * @template NarrowType The type used to narrow
+	 *
+	 * @example
+	 * ```ts
+	 * as<Gtk.Label | Gtk.Box>() // Generic argument is REQUIRED
+	 * ```
+	 */
+	as(): [never] & void,
+	/**
+	 * Type helper to allow narrowing of property descriptors' types
+	 *
+	 * @template NarrowType The type used to narrow
+	 *
+	 * @example
+	 * ```ts
+	 * as<number[]>() // Generic argument is REQUIRED
+	 * ```
+	 */
 	as<NarrowType extends {}>(): PropertyDescriptor<NarrowType | null, FlagsFrom<C>>,
 } => {
 	const nick: string | null = config?.nick || null
