@@ -373,5 +373,5 @@ const is_property_descriptor = (item: any): item is PropertyDescriptor<any, any>
 )
 
 const Property = { int32, uint32, double, string, bool, jsobject, gobject, genum } as const
-export { Property, is_property_descriptor }
+export { Property, is_property_descriptor, num_sizes_and_spec }
 export type { PropertyDescriptor, ExtractWriteableProps, ExtractReadonlyProps, ExtractConstructProps }
