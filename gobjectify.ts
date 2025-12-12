@@ -275,7 +275,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 			for (const [key, spec] of Object.entries(properties)) {
 				if (
 					spec.flags & GObject.ParamFlags.WRITABLE
-					&& !(spec.flags & GObject.ParamFlags.CONSTRUCT)
+					&& !(spec.flags & GObject.ParamFlags.CONSTRUCT_ONLY)
 				) {
 					const desc = (
 						// Find getter/setters defined on the class before finding those declared for the instance
