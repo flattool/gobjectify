@@ -15,6 +15,7 @@ import {
 	type ExtractWriteableProps,
 	is_property_descriptor,
 	Property,
+	num_sizes_and_spec,
 } from "./__internal/__property.js"
 import {
 	type ActionDescriptor,
@@ -22,7 +23,6 @@ import {
 	SimpleAction,
 	is_action_descriptor,
 } from "./__internal/__simple_action.js"
-import { NUMERIC_GTYPE_DEFAULTS } from "./__internal/property_helpers.js"
 import { ConstMap } from "./__internal/__const_map.js"
 import GLib from "gi://GLib?version=2.0"
 
@@ -291,19 +291,26 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 					}
 					const instance = this
 					const get = function (): any {
-						return desc.get?.call(instance) ?? spec.get_default_value() ?? null
+						return desc.get?.call?.(instance) ?? spec.get_default_value() ?? null
 					}
 					let set: (val: any)=> void
-					const maybe_default_nums = NUMERIC_GTYPE_DEFAULTS.looseGet(spec.value_type)
-					if (maybe_default_nums !== undefined) {
-						const min = property_descriptors[key]?.min ?? maybe_default_nums.min
-						const max = property_descriptors[key]?.max ?? maybe_default_nums.max
-						const is_double = spec.value_type === GObject.TYPE_DOUBLE
+					const type: GObject.GType = spec.value_type
+					let kind: "int32" | "uint32" | "double" | undefined
+					switch (type) {
+						case GObject.TYPE_INT: kind = "int32"; break
+						case GObject.TYPE_UINT: kind = "uint32"; break
+						case GObject.TYPE_DOUBLE: kind = "double"; break
+					}
+					if (kind) {
+						const defaults = num_sizes_and_spec.get(kind)
+						const min = property_descriptors[key]?.min ?? defaults.min
+						const max = property_descriptors[key]?.max ?? defaults.max
+						const is_double = kind === "double"
 						set = function (val: any): void {
 							if (val > max) val = max
 							if (val < min) val = min
-							if (!is_double) val = Math.trunc(val)
-							desc.set?.call(instance, val)
+							if (is_double) val = Math.trunc(val)
+							desc.set?.call?.(instance, val)
 						}
 					} else {
 						set = desc.set
