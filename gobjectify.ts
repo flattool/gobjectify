@@ -604,7 +604,7 @@ function OnSimpleAction<
  * print("Runs at the next idle cycle!")
  */
 async function next_idle(): Promise<void> {
-	return new Promise((resolve, _reject) => GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+	return new Promise((resolve, _reject) => GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
 		resolve()
 		return GLib.SOURCE_REMOVE
 	}))
@@ -625,7 +625,7 @@ async function next_idle(): Promise<void> {
  * print("Runs after 500 milliseconds!")
  */
 async function timeout_ms(duration: number): Promise<void> {
-	return new Promise((resolve, _reject) => GLib.timeout_add(GLib.PRIORITY_DEFAULT, duration, () => {
+	return new Promise((resolve, _reject) => GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, duration, () => {
 		resolve()
 		return GLib.SOURCE_REMOVE
 	}))
