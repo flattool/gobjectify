@@ -32,7 +32,7 @@ Here is an example:
 @GClass()
 @Signal("some-signal")
 export class MyWidget extends from(Gtk.Box, {
-  _button: Child(Gtk.Button),
+  _button: Child<Gtk.Button>(),
   title: Property.string({ default: "Hello" }),
   click: SimpleAction(),
 }) {
@@ -122,7 +122,7 @@ Note: do *NOT* try to instantiate from this class, you *MUST* subclass it!
 import { from, Property, Child, SimpleAction } from "./gobjectify/gobjectify.js"
 
 const Base = from(Gtk.Box, {
-  _button: Child(Gtk.Button),
+  _button: Child<Gtk.Button>(),
   title: Property.string({ default: "My Widget" }),
   activate: SimpleAction(),
 })
@@ -169,9 +169,9 @@ GObjectify automatically:
 @GClass({ template: "resource:///org/example/ui/my_widget.ui" })
 export class MainWindow extends from(Gtk.ApplicationWindow, {
   count: Property.uint32(),
-  _increment_btn: Child(Gtk.Button),
-  _decrement_btn: Child(Gtk.Button),
-  _count_lbl: Child(Gtk.Label),
+  _increment_btn: Child<Gtk.Button>(),
+  _decrement_btn: Child<Gtk.Button>(),
+  _count_lbl: Child<Gtk.Label>(),
 }) {
   _ready(): void {
     this.#on_count_change()
