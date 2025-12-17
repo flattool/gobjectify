@@ -2,10 +2,7 @@ import GObject from "gi://GObject?version=2.0"
 
 const CHILD_SYMBOL = Symbol("Symbol for GObjectify Child descriptors")
 
-type GClassFor<T extends GObject.Object> = abstract new (...args: any[])=> T
-
-type ChildDescriptor<T extends GObject.Object> = {
-	type: GClassFor<T>,
+type ChildDescriptor<_TypeHolder extends GObject.Object> = {
 	child_symbol: typeof CHILD_SYMBOL,
 }
 
@@ -21,18 +18,18 @@ type ExtractChildren<D> = {
  *
  * `from()` and `GClass` will see this descriptor and register the subclass as having this child type.
  *
- * @param child_type The GObject class of the child.
+ * @template ChildType The GObject type of the child.
  *
  * @example
  * ```ts
  * @GClass({ template: "resource:///path/to/some/UI.ui" })
  * class MyBox extends from(Gtk.Box, {
- *     _some_child(Gtk.Button),
+ *     _some_child: Child<Gtk.Button>(),
  * }) {}
  * ```
  */
-function Child<T extends GObject.Object>(child_type: GClassFor<T>): ChildDescriptor<T> {
-	return { type: child_type, child_symbol: CHILD_SYMBOL }
+function Child<ChildType extends GObject.Object>(): ChildDescriptor<ChildType> {
+	return { child_symbol: CHILD_SYMBOL }
 }
 
 function is_child_descriptor(item: any): item is ChildDescriptor<GObject.Object> {
