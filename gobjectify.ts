@@ -109,14 +109,13 @@ function is_base_metadata(item: any): item is BaseMetadata<any, GClassFor<GObjec
 	return item?.metadata_symbol === GOBJECTIFY_FROM_SYMBOL
 }
 
-type Instances<I extends (abstract new (...args: any)=> any)[]>
-	= I extends [infer First, ...infer Rest]
-		? First extends abstract new (...args: any)=> any
-			? Rest extends (abstract new (...args: any)=> any)[]
-				? InstanceType<First> & Instances<Rest>
-				: InstanceType<First>
-			: never
-		: unknown
+type Instances<I extends (abstract new (...args: any)=> any)[]> = I extends [infer First, ...infer Rest]
+	? First extends abstract new (...args: any)=> any
+		? Rest extends (abstract new (...args: any)=> any)[]
+			? InstanceType<First> & Instances<Rest>
+			: InstanceType<First>
+		: never
+	: unknown
 
 /**
  * Used in tandem with `GClass`, this function creates an abstract base class used to declare
@@ -272,58 +271,6 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 		prototype._init = function (...args: any): any {
 			const original_return_val = original_init?.apply?.(this, args)
 
-			for (const [key, spec] of Object.entries(properties)) {
-				if (
-					spec.flags & GObject.ParamFlags.WRITABLE
-					&& !(spec.flags & GObject.ParamFlags.CONSTRUCT_ONLY)
-				) {
-					const desc = (
-						// Find getter/setters defined on the class before finding those declared for the instance
-						Object.getOwnPropertyDescriptor(Object.getPrototypeOf(this), key)
-						?? Object.getOwnPropertyDescriptor(this, key)
-					)
-					if (desc === undefined || typeof desc.get !== "function" || typeof desc.set !== "function") {
-						throw new Error(dedent`
-							GClass:
-							Writeable custom GObject property '${key}' on GClass decorated class \
-							'${target.name}' is not configured with a getter or a setter function.
-						`)
-					}
-					const instance = this
-					const get = function (): any {
-						return desc.get?.call?.(instance) ?? spec.get_default_value() ?? null
-					}
-					let set: (val: any)=> void
-					const type: GObject.GType = spec.value_type
-					let kind: "int32" | "uint32" | "double" | undefined
-					switch (type) {
-						case GObject.TYPE_INT: kind = "int32"; break
-						case GObject.TYPE_UINT: kind = "uint32"; break
-						case GObject.TYPE_DOUBLE: kind = "double"; break
-					}
-					if (kind) {
-						const defaults = num_sizes_and_spec.get(kind)
-						const min = property_descriptors[key]?.min ?? defaults.min
-						const max = property_descriptors[key]?.max ?? defaults.max
-						const is_double = kind === "double"
-						set = function (val: any): void {
-							if (val > max) val = max
-							if (val < min) val = min
-							if (is_double) val = Math.trunc(val)
-							desc.set?.call?.(instance, val)
-						}
-					} else {
-						set = desc.set
-					}
-					Object.defineProperty(this, key, {
-						configurable: desc.configurable ?? true,
-						enumerable: desc.enumerable ?? true,
-						get,
-						set,
-					})
-				}
-			}
-
 			if (is_base_metadata(maybe_metadata)) {
 				let action_addable: Gio.SimpleActionGroup | Gtk.ApplicationWindow | Gtk.Application | undefined
 				let accel_setter: ((detailed_action_name: string, accels: string[])=> void) | undefined
@@ -351,7 +298,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				}
 			}
 
-			const ready = target.prototype._ready
+			const ready = prototype._ready
 			if (typeof ready === "function") {
 				GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
 					const on_error = (e: unknown): void => {
@@ -382,6 +329,69 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 			...(options?.template && { Template: options.template }),
 		}, target)
 		signals_map.delete(target)
+
+		for (const [key, spec] of Object.entries(properties)) {
+			if (
+				!(spec.flags & GObject.ParamFlags.WRITABLE)
+				|| spec.flags & GObject.ParamFlags.CONSTRUCT_ONLY
+			) continue
+			const desc = Object.getOwnPropertyDescriptor(prototype, key)
+			if (desc === undefined || typeof desc.get !== "function" || typeof desc.set !== "function") {
+				throw new Error(dedent`
+					GClass: ${target.name},
+					Writeable custom GObject property '${key}' is missing a getter or a setter function.
+				`)
+			}
+			let get: (this: T) => any
+			let set: (this: T, val: any) => void
+			const type: GObject.GType = spec.value_type
+			let kind: "int32" | "uint32" | "double" | undefined
+			switch (type) {
+				case GObject.TYPE_INT: kind = "int32"; break
+				case GObject.TYPE_UINT: kind = "uint32"; break
+				case GObject.TYPE_DOUBLE: kind = "double"; break
+			}
+			if (kind) {
+				const defaults = num_sizes_and_spec.get(kind)
+				const min = property_descriptors[key]?.min ?? defaults.min
+				const max = property_descriptors[key]?.max ?? defaults.max
+				const is_double = kind === "double"
+				get = function (): number {
+					const val: number | undefined = desc.get?.call?.(this)
+					if (val === null || val === undefined) {
+						const def: number = spec.get_default_value() as number
+						if (def > max) return max
+						if (def < min) return min
+						return def
+					}
+					return val
+				}
+				set = function (val): void {
+					if (val > max) {
+						val = max
+					} else if (val < min) {
+						val = min
+					}
+					if (!is_double) {
+						val = Math.trunc(val)
+					}
+					desc.set?.call?.(this, val)
+				}
+			} else {
+				get = function (this: T): any {
+					return desc.get?.call?.(this) ?? spec.get_default_value() ?? null
+				}
+				set = function (val): void {
+					desc.set?.call?.(this, val ?? null)
+				}
+			}
+			Object.defineProperty(prototype, key, {
+				configurable: desc.configurable ?? true,
+				enumerable: desc.enumerable ?? true,
+				get,
+				set,
+			})
+		}
 	}
 }
 
