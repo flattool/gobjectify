@@ -57,7 +57,7 @@ and that's it! No `registerClass`, no `ParamSpec`, no custom action groups. All 
 # Branches
 
 GObjectify maintains one branch per supported GNOME SDK version, make sure to clone the correct one for your project!:
-- `sdk-v49`: GNOME 49 runtime
+- `sdk-v50`: GNOME 50 runtime
 - `main`: development for the next runtime version (⚠️ UNSTABLE)
 
 When using GObjectify as a submodule, it is ***strongly recommended*** to track the branch matching your Flatpak runtime version
@@ -74,8 +74,8 @@ The only dependency of GObjectify is TS types for GObject introspection. You can
 
 ```
 cd your-project/src
-git submodule add -b sdk-v49 https://github.com/flattool/gobjectify.git gobjectify
-# You can replace 'sdk-v49' for any other branch choice!
+git submodule add -b sdk-v50 https://github.com/flattool/gobjectify.git gobjectify
+# You can replace 'sdk-v50' for any other branch choice!
 ```
 
 Then update it at any time with:
@@ -83,7 +83,7 @@ Then update it at any time with:
 ```sh
 cd gobjectify
 git fetch
-git merge origin/sdk-v49
+git merge origin/sdk-v50
 ```
 
 Or just update *all* of your project's submodules via:
