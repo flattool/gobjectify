@@ -6,7 +6,7 @@ GObjectify is a TypeScript library for GJS designed to dramatically improve the 
 It provides:
 - **Strong type safety**: GObject properties, template children, signals, actions, and interfaces are all fully typed
 - **Declarative class definitions**: Decorators and mixins allow GObject subclassing without manual class registration
-- **Main-loop helpers**: `timeout`, `next_idle`, and `connect_async` integrate cleanly with GLib
+- **Main-loop helpers**: `timeout_ms`, `next_idle`, and `connect_async` integrate cleanly with GLib
 - **Quality-of-life utilities**: `dedent`, `ConstMap`, and others reduce common GJS friction
 - **Zero-boilerplate subclassing**: Define properties, actions, and template children in one place, GObjectify handles the rest
 
@@ -33,7 +33,7 @@ Here is an example:
 @Signal("some-signal")
 export class MyWidget extends from(Gtk.Box, {
   _button: Child<Gtk.Button>(),
-  title: Property.string({ default: "Hello" }),
+  title: Property.string({ default: "Hello", flags: "CONSTRUCT" }),
   click: SimpleAction(),
 }) {
   _ready(): void {
@@ -46,7 +46,7 @@ export class MyWidget extends from(Gtk.Box, {
     this.emit("some-signal")
   }
 
-  @OnSignal("notify::title")
+  @OnChange("title")
   on_title_changed(): void {
     print(`My title was changed to: ${this.title}`)
   }
@@ -136,7 +136,7 @@ The GClass decorator is the other half of the magic; It tells GObject to registe
 
 ```ts
 // This code is continued in the same file from Step 1
-import { GClass, OnSimpleAction } from "./gobjectify.gobjectify.js"
+import { GClass, OnSimpleAction } from "./gobjectify/gobjectify.js"
 
 @GClass({
   template: "resource:///org/example/ui/my_widget.ui",
@@ -161,39 +161,39 @@ GObjectify automatically:
 - Installs SimpleActions
 - Connects `@OnSimpleAction` handlers
 - Applies the custom CSS name
-- Runs the `_ready()` function an idle frame after construction
+- Runs the `_ready()` when in class initialization, after template children are bound
 
 # An Example: Gtk Application Window with a counter
 
 ```ts
 @GClass({ template: "resource:///org/example/ui/my_widget.ui" })
 export class MainWindow extends from(Gtk.ApplicationWindow, {
-  count: Property.uint32(),
+  count: Property.uint32({ flags: "CONSTRUCT" }),
   _increment_btn: Child<Gtk.Button>(),
   _decrement_btn: Child<Gtk.Button>(),
   _count_lbl: Child<Gtk.Label>(),
 }) {
   _ready(): void {
-    this.#on_count_change()
     this._increment_btn.connect("clicked", () => this.count++)
     this._decrement_btn.connect("clicked", () => this.count--)
   }
 
-  @OnSignal("notify::count")
+  @OnChange("count")
   #on_count_change(): void {
     this._count_lbl.label = `Count at: ${this.count}`
   }
 }
 ```
 
-Here, GObjectify registeres the class with a UI template, binds the internal widgets, creats the GObject properties, binds the `on_count_change` function to the notify signal for `count`, and will run the `_ready()` function (which handles our button click connections).
+Here, GObjectify registers the class with a UI template, binds the internal widgets, creates the GObject properties, binds the `on_count_change` function to the notify signal for `count`, and will run the `_ready()` function (which handles our button click connections).
 
-Tip: Using UI bound properties can reduce this code even more! (Not demonstrated here, as UI files are out of GObjectify's scope)
+Tip: Using UI bound properties can reduce this code even more! (Not demonstrated here, as UI files are out of GObjectify's scope, other than registering templates)
 
 # Advanced Features
 
-GObjectify also includes a number of small but powerful tools to make your life easier:
+GObjectify also includes a number of small but powerful, advanced tools to make your life easier:
 
 - **Debounced methods**: `@Debounce(ms)` to limit how often a method runs, perfect for rapid events
+- **Self signal connections** `@OnSignal("signal-name")` on methods to run that method when a signal on the instance is emitted
 - **Automatic notifications**: `@Notify` on setters triggers GObject property notifications automatically
 - **Async signal handling**: `connect_async` to `await` signals like promises, avoiding messy callbacks
