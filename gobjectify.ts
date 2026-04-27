@@ -94,6 +94,18 @@ type ClassDecoratorParams = {
 	manual_internal_children?: string[],
 }
 
+type OnChangeKeys<T extends GObject.Object> = {
+	[Key in keyof T]: Key extends string
+		? Key extends `_${string}`
+			? never
+			: Key extends "with_implements" | "$signals"
+				? never
+				: T[Key] extends Function
+					? never
+					: Key
+		: never
+}[keyof T]
+
 const GOBJECTIFY_FROM_SYMBOL = Symbol("GOBJECTIFY_FROM_SYMBOL")
 const ACTION_GROUP_SYMBOL = Symbol("GObjectify_Action_Group_Symbol")
 const signals_map = new WeakMap<Function, Record<string, Signal>>()
@@ -172,7 +184,7 @@ type ReadyFunc = { _ready?: ()=> (void | Promise<void>) }
  * It wraps a standard GObject derived class and automatically handles:
  * - Sets the class name as the GType name (can be overridden with `options.manual_gtype_name`)
  * - Registering signals declared via the `Signal` decorator
- * - Running an optional `_ready` method after the first idle iteration of the Gtk Main Loop after instantiation
+ * - Running an optional `_ready` method synchronously during instantiation, after template children are bound
  * - Registering an optional UI template file, custom CSS name, GType Flags, or interface implementations
  * - Registers and inits GObject properties provided by the `from` base and/or from `manual_properties`
  * - Registers internal children provided by the `from` base and/or from `manual_internal_children`
@@ -195,18 +207,19 @@ type ReadyFunc = { _ready?: ()=> (void | Promise<void>) }
  * ```ts
  * @GClass({ css_name: "my-widget", template: "resource:///org/my/app/ui/my_widget.ui" })
  * class MyWidget extends from(Gtk.Box, {
- *     title: Property("string", { default: "My Awesome Widget!" }),
+ *     title: Property.string({ default: "My Awesome Widget", flags: "CONSTRUCT" }),
  * }) {
  *     _ready() {
- *         print(`${this.title} is ready!)
+ *         print(`${this.title} is ready!`)
  *     }
  * }
  * ```
  *
  * @remarks
  * If a `_ready` function is defined on the class, it may only return `void` or `Promise<void>`.
- * If provided, the `_ready` function will be called once on the next GLib idle cycle after initialization,
- * allowing you to safely run post-construction logic.
+ * If provided, the `_ready` is called once synchronously during initialization, after template children
+ * have been bound. At this point, `CONSTRUCT` and `CONSTRUCT_ONLY` properties are guaranteed to be
+ * set, but `READWRITE` properties set by GtkBuilder may not yet be available.
  */
 function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 	return function (target: GClassFor<T & ReadyFunc>, _context: ClassDecoratorContext): void {
@@ -265,7 +278,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 		properties = { ...properties, ...options?.manual_properties ?? {} }
 		children = [...children, ...options?.manual_internal_children ?? []]
 
-		// on first instance being created, thanks GTK for having an init hook
+		// runs when an instance is create, thanks GTK for having an init hook
 		// -------------------------------------------------------------------
 		const original_init = prototype._init
 		prototype._init = function (...args: any): any {
@@ -300,19 +313,16 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 
 			const ready = prototype._ready
 			if (typeof ready === "function") {
-				GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-					const on_error = (e: unknown): void => {
-						print(`Error in $ready function for ${target.name}`)
-						print(e)
-					}
-					try {
-						const return_val = ready.call(this)
-						if (return_val instanceof Promise) return_val.catch(on_error)
-					} catch (e) {
-						on_error(e)
-					}
-					return GLib.SOURCE_REMOVE
-				})
+				const on_error = (e: unknown): void => {
+					print(`Error in $ready function for ${target.name}`)
+					print(e)
+				}
+				try {
+					const return_val = ready.call(this)
+					if (return_val instanceof Promise) return_val.catch(on_error)
+				} catch (e) {
+					on_error(e)
+				}
 			}
 
 			return original_return_val
@@ -508,19 +518,19 @@ function Debounce<T extends GObject.Object, U extends (this: T, ...args: any[])=
  * class MyWidget extends Gtk.Box {
  *     private __count = 0
  *
- *     get a_count(): number {
+ *     get count_value(): number {
  *         return this.__count
  *     }
  *
  *     @Notify
- *     set a_count(val: number) {
- *         print(`Setting a_count to ${val}`)
+ *     set count_value(val: number) {
+ *         print(`Setting count_value to ${val}`)
  *         this.__count = val
  *     }
  * }
  *
  * const widget = new MyWidget();
- * widget.counter = 42; // Automatically calls widget.notify("a-count")
+ * widget.count_value = 42; // Automatically calls widget.notify("count-value")
  */
 function Notify<T extends GObject.Object, U>(
 	target: (this: T, arg0: U)=> void,
@@ -558,7 +568,7 @@ function Notify<T extends GObject.Object, U>(
  * }
  * ```
  *
- * // handle_Click is automatically called when "clicked" is emitted
+ * // handle_click is automatically called when "clicked" is emitted
  */
 function OnSignal(signal_name: string) {
 	return <T extends GObject.Object>(
@@ -598,6 +608,56 @@ function OnSimpleAction<
 	return function (target: U, context: ClassMethodDecoratorContext<T>): void {
 		context.addInitializer(function (this: T): void {
 			(this[action_name] as Gio.SimpleAction).connect("activate", target.bind(this))
+		})
+	}
+}
+
+/**
+ * Decorator that connects a method to one or more GObject property change notifications.
+ *
+ * When applied to a class method, `OnChange("prop_name")` ensures that the method is
+ * automatically connected to `"notify::prop-name"` for the given property on each instance.
+ *
+ * If the property is declared with `CONSTRUCT` or `CONSTRUCT_ONLY` flags (see `from` for how to add properties),
+ * the method will also be called once immediately during initialization, after template children have been bound.
+ * For properties declared with the `READWRITE` flag (default), the method is only called when the property
+ * changes post-construction.
+ *
+ * Multiple `@OnChange` decorators can be stacked on a single method to watch several properties.
+ *
+ * @param prop_name The snake_case name of the GObject property to watch.
+ *
+ * @example
+ * ```ts
+ * @GClass()
+ * class MyButton extends from(Gtk.Box, {
+ *     header_title: Property.string({ flags: "CONSTRUCT" }),
+ * }) {
+ *     @OnChange("header_title")
+ *     #on_header_title_changed(): void {
+ *         print("title is now", this.header_title)
+ *     }
+ * }
+ * ```
+ *
+ * @remarks
+ * The property name is automatically converted from snake_case to kebab-case
+ * when connecting to the notify signal, so you don't need to think about the
+ * distinction. Property names must be valid, registered GObject properties.
+ * Plain JavaScript fields are *not valid* and will *cause errors*.
+ */
+function OnChange<
+	T extends GObject.Object,
+	K extends OnChangeKeys<T>
+>(prop_name: K) {
+	const kebab: string = prop_name.replaceAll("_", "-")
+	return (target: (this: T) => any, context: ClassMethodDecoratorContext<T>): void => {
+		context.addInitializer(function (this: T): void {
+			const spec: GObject.ParamSpec = GObject.Object.find_property.call(this.constructor, kebab)
+			this.connect(`notify::${kebab}`, target.bind(this))
+			if ((spec.flags & GObject.ParamFlags.CONSTRUCT) || (spec.flags & GObject.ParamFlags.CONSTRUCT_ONLY)) {
+				target.call(this)
+			}
 		})
 	}
 }
@@ -754,6 +814,7 @@ export {
 	Signal,
 	Debounce,
 	Notify,
+	OnChange,
 	OnSignal,
 	OnSimpleAction,
 	Property,
