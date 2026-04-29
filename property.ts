@@ -1,6 +1,6 @@
 import GObject from "gi://GObject?version=2.0"
 import GLib from "gi://GLib?version=2.0"
-import { ConstMap } from "./__const_map.js"
+import { ConstMap } from "./const_map.js"
 
 type GClass<T extends GObject.Object = GObject.Object> = { $gtype: GObject.GType } & (abstract new(...args: any[])=> T)
 type GEnum<T extends number = number> = { $gtype: GObject.GType<T> } & { new?: never }

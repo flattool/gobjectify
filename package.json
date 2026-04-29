@@ -1,0 +1,20 @@
+{
+  "name": "gobjectify",
+  "version": "1.0.0",
+  "description": "\"A type-safe, declarative TypeScript library for writing & interacting with GObject classes in GNOME JavaScript (GJS)\"",
+  "main": "gobjectify.js",
+  "scripts": {
+    "build": "rollup -c rollup.config.mjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "type": "module",
+  "author": "Heliguy",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-typescript": "^12.3.0",
+    "rollup": "^4.60.2",
+    "rollup-plugin-dts": "^6.4.1",
+    "tslib": "^2.8.1",
+    "typescript": "^6.0.3"
+  }
+}

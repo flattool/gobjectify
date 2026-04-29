@@ -6,7 +6,7 @@ GObjectify is a TypeScript library for GJS designed to dramatically improve the 
 It provides:
 - **Strong type safety**: GObject properties, template children, signals, actions, and interfaces are all fully typed
 - **Declarative class definitions**: Decorators and mixins allow GObject subclassing without manual class registration
-- **Main-loop helpers**: `timeout`, `next_idle`, and `connect_async` integrate cleanly with GLib
+- **Main-loop helpers**: `timeout_ms`, `next_idle`, and `connect_async` integrate cleanly with GLib
 - **Quality-of-life utilities**: `dedent`, `ConstMap`, and others reduce common GJS friction
 - **Zero-boilerplate subclassing**: Define properties, actions, and template children in one place, GObjectify handles the rest
 
@@ -33,7 +33,7 @@ Here is an example:
 @Signal("some-signal")
 export class MyWidget extends from(Gtk.Box, {
   _button: Child<Gtk.Button>(),
-  title: Property.string({ default: "Hello" }),
+  title: Property.string({ default: "Hello", flags: "CONSTRUCT" }),
   click: SimpleAction(),
 }) {
   _ready(): void {
@@ -46,7 +46,7 @@ export class MyWidget extends from(Gtk.Box, {
     this.emit("some-signal")
   }
 
-  @OnSignal("notify::title")
+  @WatchProp("title")
   on_title_changed(): void {
     print(`My title was changed to: ${this.title}`)
   }
@@ -54,52 +54,26 @@ export class MyWidget extends from(Gtk.Box, {
 ```
 and that's it! No `registerClass`, no `ParamSpec`, no custom action groups. All of it is automatically handled for you! And the best part, all of this is type-safe, which means you can't accidentally set up something incorrectly, or assign the wrong kind of value.
 
-# Branches
-
-GObjectify maintains one branch per supported GNOME SDK version, make sure to clone the correct one for your project!:
-- `sdk-v49`: GNOME 49 runtime
-- `main`: development for the next runtime version (⚠️ UNSTABLE)
-
-When using GObjectify as a submodule, it is ***strongly recommended*** to track the branch matching your Flatpak runtime version
-
 # Installation
 
-GNOME JS is *NOT* a browser or Node environment, which means you cannot install libraries from NPM or import packages the same way you would for web or Node. Because of this, GObjectify must be installed by adding it as a submodule for your project.
+GNOME JS is *NOT* a browser or Node environment, which means you cannot install libraries from NPM or import packages the same way you would for web or Node. Because of this, GObjectify must be installed by dropping its files into your project.
 
 ## Dependencies
 
 The only dependency of GObjectify is TS types for GObject introspection. You can generate your own with `ts-for-gir`, but we recommend using [Flattool's already generated types](https://github.com/flattool/gir-ts-types). They are pre-generated, versioned, and match the GNOME SDK runtimes used on Flathub.
 
-## 1. Install as a Git Submodule
+## 1. Download the library
 
-```
-cd your-project/src
-git submodule add -b sdk-v49 https://github.com/flattool/gobjectify.git gobjectify
-# You can replace 'sdk-v49' for any other branch choice!
-```
-
-Then update it at any time with:
-
-```sh
-cd gobjectify
-git fetch
-git merge origin/sdk-v49
-```
-
-Or just update *all* of your project's submodules via:
-
-```sh
-git submodule update --remote --merge
-```
-
-You can place the submodule repo anywhere you'd like, but it is ***strongly recommended*** to put it inside of your project's source directory:
+- Grab `gobjectify.js` and `gobjectify.d.ts` from Releases
+- Place them into your `src/` directory.
 
 ```sh
 your-project/
   src/
     your_code.ts
-    gobjectify/   # submodule repo
-      (cloned repo contents)
+    gobjectify/   # create this folder if you'd like
+      gobjectify.d.ts
+      gobjectify.js
   tsconfig.json
 ```
 
@@ -136,7 +110,7 @@ The GClass decorator is the other half of the magic; It tells GObject to registe
 
 ```ts
 // This code is continued in the same file from Step 1
-import { GClass, OnSimpleAction } from "./gobjectify.gobjectify.js"
+import { GClass, OnSimpleAction } from "./gobjectify/gobjectify.js"
 
 @GClass({
   template: "resource:///org/example/ui/my_widget.ui",
@@ -161,39 +135,39 @@ GObjectify automatically:
 - Installs SimpleActions
 - Connects `@OnSimpleAction` handlers
 - Applies the custom CSS name
-- Runs the `_ready()` function an idle frame after construction
+- Runs the `_ready()` when in class initialization, after template children are bound
 
 # An Example: Gtk Application Window with a counter
 
 ```ts
 @GClass({ template: "resource:///org/example/ui/my_widget.ui" })
 export class MainWindow extends from(Gtk.ApplicationWindow, {
-  count: Property.uint32(),
+  count: Property.uint32({ flags: "CONSTRUCT" }),
   _increment_btn: Child<Gtk.Button>(),
   _decrement_btn: Child<Gtk.Button>(),
   _count_lbl: Child<Gtk.Label>(),
 }) {
   _ready(): void {
-    this.#on_count_change()
     this._increment_btn.connect("clicked", () => this.count++)
     this._decrement_btn.connect("clicked", () => this.count--)
   }
 
-  @OnSignal("notify::count")
+  @WatchProp("count")
   #on_count_change(): void {
     this._count_lbl.label = `Count at: ${this.count}`
   }
 }
 ```
 
-Here, GObjectify registeres the class with a UI template, binds the internal widgets, creats the GObject properties, binds the `on_count_change` function to the notify signal for `count`, and will run the `_ready()` function (which handles our button click connections).
+Here, GObjectify registers the class with a UI template, binds the internal widgets, creates the GObject properties, binds the `on_count_change` function to the notify signal for `count`, and will run the `_ready()` function (which handles our button click connections).
 
-Tip: Using UI bound properties can reduce this code even more! (Not demonstrated here, as UI files are out of GObjectify's scope)
+Tip: Using UI bound properties can reduce this code even more! (Not demonstrated here, as UI files are out of GObjectify's scope, other than registering templates)
 
 # Advanced Features
 
-GObjectify also includes a number of small but powerful tools to make your life easier:
+GObjectify also includes a number of small but powerful, advanced tools to make your life easier:
 
 - **Debounced methods**: `@Debounce(ms)` to limit how often a method runs, perfect for rapid events
+- **Self signal connections** `@OnSignal("signal-name")` on methods to run that method when a signal on the instance is emitted
 - **Automatic notifications**: `@Notify` on setters triggers GObject property notifications automatically
 - **Async signal handling**: `connect_async` to `await` signals like promises, avoiding messy callbacks
