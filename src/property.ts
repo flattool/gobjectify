@@ -6,11 +6,13 @@ type GClass<T extends GObject.Object = GObject.Object> = { $gtype: GObject.GType
 type GEnum<T extends number = number> = { $gtype: GObject.GType<T> } & { new?: never }
 
 const FLAG_PRESETS = {
-	CONSTANT: GObject.ParamFlags.READABLE,
-	READWRITE: GObject.ParamFlags.READWRITE,
-	CONSTRUCT: GObject.ParamFlags.READWRITE | GObject.ParamFlags.CONSTRUCT,
-	CONSTRUCT_ONLY: GObject.ParamFlags.READWRITE | GObject.ParamFlags.CONSTRUCT_ONLY,
+	readwrite: GObject.ParamFlags.CONSTRUCT | GObject.ParamFlags.READWRITE,
+	readonly: GObject.ParamFlags.CONSTRUCT | GObject.ParamFlags.READWRITE, // Will be treated by GObjectify as readonly post-init
+	const: GObject.ParamFlags.READABLE,
 } as const
+
+type DEFAULT_FLAG = "readwrite"
+const DEFAULT_FLAG: keyof typeof FLAG_PRESETS = "readwrite" satisfies DEFAULT_FLAG
 
 const PROPERTY_SYMBOL = Symbol("Symbol for GObjectify Property descriptors")
 
@@ -40,9 +42,6 @@ type PropertyDescriptor<ValueType, Flags extends ParamFlagStrings> = {
 	readonly property_symbol: typeof PROPERTY_SYMBOL,
 	create(name: string): GObject.ParamSpec,
 }
-
-type __NoArg = typeof noArgSentinel
-declare const noArgSentinel: unique symbol
 
 type Castable<WideType, Config extends DefaultableConfig<WideType>> = {
 	/**
@@ -74,27 +73,27 @@ type Castable<WideType, Config extends DefaultableConfig<WideType>> = {
 }
 
 type ExtractWriteableProps<D> = {
-	[Key in keyof D as D[Key] extends PropertyDescriptor<any, "CONSTRUCT" | "READWRITE">
+	[Key in keyof D as D[Key] extends PropertyDescriptor<any, "readwrite">
 		? Key
 		: never
 	]: D[Key] extends PropertyDescriptor<infer T, any> ? T : never
 }
 
 type ExtractReadonlyProps<D> = {
-	readonly [Key in keyof D as D[Key] extends PropertyDescriptor<any, "CONSTANT" | "CONSTRUCT_ONLY">
+	readonly [Key in keyof D as D[Key] extends PropertyDescriptor<any, "const" | "readonly">
 		? Key
 		: never
 	]: D[Key] extends PropertyDescriptor<infer T, any> ? T : never
 }
 
 type ExtractConstructProps<D> = {
-	[Key in keyof D as D[Key] extends PropertyDescriptor<any, "CONSTRUCT" | "CONSTRUCT_ONLY">
+	[Key in keyof D as D[Key] extends PropertyDescriptor<any, "readonly">
 		? Key
 		: never
 	]: D[Key] extends PropertyDescriptor<infer T, any> ? T : never
 }
 
-type FlagsFrom<C extends BaseConfig> = C extends { flags: infer F } ? F : "READWRITE"
+type FlagsFrom<C extends BaseConfig> = C extends { flags: infer F } ? F : DEFAULT_FLAG
 
 const num_sizes_and_spec = new ConstMap(
 	["int32", { min: GLib.MININT32, max: GLib.MAXINT32, spec: GObject.ParamSpec.int }],
@@ -111,7 +110,7 @@ const primitive_property = (kind: "int32" | "uint32" | "double") => {
 	> & Castable<number, C> => {
 		const nick: string | null = config?.nick || null
 		const blurb: string | null = config?.blurb || null
-		const flags: GObject.ParamFlags = get_flags(config?.flags ?? "READWRITE")
+		const flags: GObject.ParamFlags = get_flags(config?.flags ?? DEFAULT_FLAG)
 		const range_and_spec = num_sizes_and_spec.get(kind)
 		const min = config?.min ?? range_and_spec.min
 		const max = config?.max ?? range_and_spec.max
@@ -190,12 +189,12 @@ const string = <const C extends StringConfig>(
 ): PropertyDescriptor<string, FlagsFrom<C>> & Castable<string, C> => {
 	const nick: string | null = config?.nick || null
 	const blurb: string | null = config?.blurb || null
-	const flags: GObject.ParamFlags = get_flags(config?.flags ?? "READWRITE")
+	const flags: GObject.ParamFlags = get_flags(config?.flags ?? DEFAULT_FLAG)
 	return {
 		property_symbol: PROPERTY_SYMBOL,
 		min: undefined,
 		max: undefined,
-		flags: config?.flags ?? "READWRITE" as any,
+		flags: config?.flags ?? DEFAULT_FLAG as any,
 		create: (name) => GObject.ParamSpec.string(name, nick, blurb, flags, config?.default ?? ""),
 		as(): any { return this },
 	}
@@ -219,12 +218,12 @@ const bool = <const C extends BoolConfig>(
 ): PropertyDescriptor<boolean, FlagsFrom<C>> & Castable<boolean, C> => {
 	const nick: string | null = config?.nick || null
 	const blurb: string | null = config?.blurb || null
-	const flags: GObject.ParamFlags = get_flags(config?.flags ?? "READWRITE")
+	const flags: GObject.ParamFlags = get_flags(config?.flags ?? DEFAULT_FLAG)
 	return {
 		property_symbol: PROPERTY_SYMBOL,
 		min: undefined,
 		max: undefined,
-		flags: config?.flags ?? "READWRITE" as any,
+		flags: config?.flags ?? DEFAULT_FLAG as any,
 		create: (name) => GObject.ParamSpec.boolean(name, nick, blurb, flags, config?.default ?? false),
 		as(): any { return this },
 	}
@@ -275,12 +274,12 @@ const gobject = <G extends GClass, C extends BaseConfig>(kind: G, config?: C): P
 } => {
 	const nick: string | null = config?.nick || null
 	const blurb: string | null = config?.blurb || null
-	const flags: GObject.ParamFlags = get_flags(config?.flags ?? "READWRITE")
+	const flags: GObject.ParamFlags = get_flags(config?.flags ?? DEFAULT_FLAG)
 	return {
 		property_symbol: PROPERTY_SYMBOL,
 		min: undefined,
 		max: undefined,
-		flags: config?.flags ?? "READWRITE" as any,
+		flags: config?.flags ?? DEFAULT_FLAG as any,
 		create: (name) => GObject.ParamSpec.object(name, nick, blurb, flags, kind),
 		as(): any { return this },
 	}
@@ -306,12 +305,12 @@ const genum = <G extends number, C extends DefaultableConfig<G>>(
 ): PropertyDescriptor<G, FlagsFrom<C>> => {
 	const nick: string | null = config?.nick || null
 	const blurb: string | null = config?.blurb || null
-	const flags: GObject.ParamFlags = get_flags(config?.flags ?? "READWRITE")
+	const flags: GObject.ParamFlags = get_flags(config?.flags ?? DEFAULT_FLAG)
 	return {
 		property_symbol: PROPERTY_SYMBOL,
 		min: undefined,
 		max: undefined,
-		flags: config?.flags ?? "READWRITE" as any,
+		flags: config?.flags ?? DEFAULT_FLAG as any,
 		create: (name) => GObject.ParamSpec.enum(name, nick, blurb, flags, kind, config?.default ?? null),
 	}
 }
@@ -357,18 +356,18 @@ const jsobject = <C extends BaseConfig>(config?: C): PropertyDescriptor<{} | nul
 } => {
 	const nick: string | null = config?.nick || null
 	const blurb: string | null = config?.blurb || null
-	const flags: GObject.ParamFlags = get_flags(config?.flags ?? "READWRITE")
+	const flags: GObject.ParamFlags = get_flags(config?.flags ?? DEFAULT_FLAG)
 	return {
 		property_symbol: PROPERTY_SYMBOL,
 		min: undefined,
 		max: undefined,
-		flags: config?.flags ?? "READWRITE" as any,
+		flags: config?.flags ?? DEFAULT_FLAG as any,
 		create: (name) => GObject.ParamSpec.jsobject(name, nick, blurb, flags),
 		as(): any { return this },
 	}
 }
 
-const is_property_descriptor = (item: any): item is PropertyDescriptor<any, any> => (
+const is_property_descriptor = (item: any): item is PropertyDescriptor<any, ParamFlagStrings> => (
 	item?.property_symbol === PROPERTY_SYMBOL
 )
 

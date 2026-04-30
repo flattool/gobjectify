@@ -28,7 +28,7 @@ const banner = `/*!
  * SOFTWARE.
  */`
 
-const input = "gobjectify.ts"
+const input = "src/gobjectify.ts"
 const output_dir = "dist"
 const tsconfig = "./tsconfig.json"
 

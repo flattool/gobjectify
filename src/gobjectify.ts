@@ -53,7 +53,7 @@ type AbstractGClassFor<T extends GObject.Object> = abstract new (...args: any[])
 type ResultingConstructorArgs<
 	T extends AbstractGClassFor<GObject.Object>,
 	D extends Descriptor<D, InstanceType<T>>,
-> = ExtractConstructProps<D> & Partial<ExtractWriteableProps<D>>
+> = Partial<ExtractConstructProps<D> & ExtractWriteableProps<D>>
 
 type ResultingClass<
 	T extends AbstractGClassFor<GObject.Object>,
@@ -86,7 +86,6 @@ type Signal = {
 
 type ClassDecoratorParams = {
 	template?: Uint8Array | GLib.Bytes | string,
-	// implements?: { $gtype: GObject.GType }[],
 	css_name?: string,
 	gtype_flags?: GObject.TypeFlags,
 	manual_gtype_name?: string,
@@ -108,6 +107,7 @@ type WatchPropKeys<T extends GObject.Object> = {
 
 const GOBJECTIFY_FROM_SYMBOL = Symbol("GOBJECTIFY_FROM_SYMBOL")
 const ACTION_GROUP_SYMBOL = Symbol("GObjectify_Action_Group_Symbol")
+const INIT_FINISHED_SYMBOL = Symbol("GObjectify_GClass_Initialization_Finished_Symbol")
 const signals_map = new WeakMap<Function, Record<string, Signal>>()
 
 type BaseMetadata<D, T extends AbstractGClassFor<GObject.Object>> = {
@@ -178,6 +178,74 @@ function from<
 
 type ReadyFunc = { _ready?: ()=> (void | Promise<void>) }
 
+const on_error = (class_name: string, e: unknown): void => {
+	print(`Error in $ready function for ${class_name}`)
+	print(e)
+}
+
+const make_numeric_accessors = (
+	spec: GObject.ParamSpec<number>,
+	desc: globalThis.PropertyDescriptor,
+	kind: "int32" | "uint32" | "double",
+	prop?: PropertyDescriptor<any, any>,
+): { get(): number, set(val: number): void } => {
+	const defaults = num_sizes_and_spec.get(kind)
+	const min = prop?.min ?? defaults.min
+	const max = prop?.max ?? defaults.max
+	const is_double = kind === "double"
+	return {
+		get() {
+			const val: number | null | undefined = desc.get?.call?.(this)
+			if (val === null || val === undefined) {
+				const def = spec.get_default_value() as number
+				if (def > max) return max
+				if (def < min) return min
+				return def
+			}
+			return val
+		},
+		set(val) {
+			if (val > max) {
+				val = max
+			} else if (val < min) {
+				val = min
+			}
+			if (!is_double) {
+				val = Math.trunc(val)
+			}
+			desc.set?.call?.(this, val)
+		},
+	}
+}
+
+const make_non_numeric_accessors = (
+	spec: GObject.ParamSpec<number>,
+	desc: globalThis.PropertyDescriptor,
+	prop_name: string,
+	class_name: string,
+	prop?: PropertyDescriptor<any, any>,
+): { get(): any, set(val: any): void } => {
+	let set: (val: any)=> void
+	if (prop?.flags === "readonly") {
+		set = function (this: any, val): void {
+			if (this[INIT_FINISHED_SYMBOL]) {
+				throw new Error(`Property '${prop_name}' in GClass decorated class '${class_name}' is readonly and cannot be set after initialization.`)
+			}
+			desc.set?.call?.(this, val ?? null)
+		}
+	} else {
+		set = function (this: any, val): void {
+			desc.set?.call?.(this, val ?? null)
+		}
+	}
+	return {
+		get(): any {
+			return desc.get?.call?.(this) ?? spec.get_default_value() ?? null
+		},
+		set,
+	}
+}
+
 /**
  * Class decorator to define a GObject/Gtk class with properties, children, actions, and signals.
  *
@@ -226,12 +294,11 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 		const prototype = target.prototype
 		const parent = Object.getPrototypeOf(target)
 		const maybe_metadata: unknown = (parent as any)?.[GOBJECTIFY_FROM_SYMBOL]
-
-		let properties: Record<string, GObject.ParamSpec<any>> = {}
+		const properties: Record<string, GObject.ParamSpec<any>> = {}
 		const property_descriptors: Record<string, PropertyDescriptor<any, any>> = {}
-		let children: string[] = []
-		let actions = new Map<string, ActionDescriptor>()
-		let implement: (AbstractGClassFor<GObject.Object> & { $gtype: GObject.GType })[]
+		const children: string[] = []
+		const actions = new Map<string, ActionDescriptor>()
+		let implement: (AbstractGClassFor<GObject.Object> & { $gtype: GObject.GType })[] = []
 
 		if (is_base_metadata(maybe_metadata)) {
 			const real_base = maybe_metadata.extend.prototype
@@ -243,7 +310,6 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				get(): any {
 					return this
 				},
-				set(__: any) {},
 			})
 
 			for (const [name, value] of Object.entries(maybe_metadata.descriptor)) {
@@ -252,7 +318,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 					const spec = value.create(name)
 					properties[name] = spec
 					if (
-						spec.flags && GObject.ParamFlags.READABLE
+						(spec.flags & GObject.ParamFlags.READABLE)
 						&& !(spec.flags & GObject.ParamFlags.WRITABLE)
 					) {
 						// Make getters for CONSTANT properties (flags: READABLE but not WRITEABLE nor READWRITE)
@@ -263,20 +329,23 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 						})
 					}
 				} else if (is_child_descriptor(value)) {
-					children.push(name)
+					children.push(name.replace("_", ""))
 				} else if (is_action_descriptor(value)) {
 					actions.set(name, value)
 				}
 			}
 
+			// Remove the 'from' base class from the prototype chain, making the decorated class directly extend the base GObject class
 			Object.setPrototypeOf(prototype, real_base)
 			Object.setPrototypeOf(target, maybe_metadata.extend)
 		}
 
-		implement ??= []
-
-		properties = { ...properties, ...options?.manual_properties ?? {} }
-		children = [...children, ...options?.manual_internal_children ?? []]
+		for (const [name, spec] of Object.entries(options?.manual_properties ?? {})) {
+			if (properties[name]) {
+				throw new Error(`Manual property '${name}' in GClass decorated class '${target.name}' conflicts with a property of the same name defined in the 'from' base. Please rename one of them.`)
+			}
+			properties[name] = spec
+		}
 
 		// runs when an instance is create, thanks GTK for having an init hook
 		// -------------------------------------------------------------------
@@ -284,7 +353,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 		prototype._init = function (...args: any): any {
 			const original_return_val = original_init?.apply?.(this, args)
 
-			if (is_base_metadata(maybe_metadata)) {
+			if (is_base_metadata(maybe_metadata) && actions.size > 0) {
 				let action_addable: Gio.SimpleActionGroup | Gtk.ApplicationWindow | Gtk.Application | undefined
 				let accel_setter: ((detailed_action_name: string, accels: string[])=> void) | undefined
 
@@ -294,11 +363,8 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 					action_addable = this
 					accel_setter = this.set_accels_for_action.bind(this)
 				} else if (this instanceof Gtk.Widget) {
-					const group: Gio.SimpleActionGroup = (
-						(this as any)[ACTION_GROUP_SYMBOL] ??= new Gio.SimpleActionGroup()
-					)
-					action_addable = group
-					this.insert_action_group(target.name, group)
+					action_addable = ((this as any)[ACTION_GROUP_SYMBOL] ??= new Gio.SimpleActionGroup())
+					this.insert_action_group(target.name, action_addable)
 				}
 
 				if (action_addable !== undefined) {
@@ -311,28 +377,28 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				}
 			}
 
+			// makes "readonly" flagged properties throw when set after this point
+			this[INIT_FINISHED_SYMBOL] = true
+
 			const ready = prototype._ready
 			if (typeof ready === "function") {
-				const on_error = (e: unknown): void => {
-					print(`Error in $ready function for ${target.name}`)
-					print(e)
-				}
 				try {
 					const return_val = ready.call(this)
-					if (return_val instanceof Promise) return_val.catch(on_error)
+					if (return_val instanceof Promise) return_val.catch(on_error.bind(null, target.name))
 				} catch (e) {
-					on_error(e)
+					on_error(target.name, e)
 				}
 			}
 
 			return original_return_val
 		}
+		// -------------------------------------------------------------------
 
 		GObject.registerClass({
 			GTypeName: options?.manual_gtype_name || target.name,
 			Implements: implement,
 			Properties: properties,
-			InternalChildren: children.map((name) => name.replace("_", "")),
+			InternalChildren: options?.manual_internal_children?.concat(children) ?? children,
 			Signals: signals_map.get(target) ?? {},
 			...(options?.css_name && { CssName: options.css_name }),
 			...(options?.gtype_flags && { GTypeFlags: options.gtype_flags }),
@@ -352,54 +418,21 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 					Writeable custom GObject property '${key}' is missing a getter or a setter function.
 				`)
 			}
-			let get: (this: T) => any
-			let set: (this: T, val: any) => void
-			const type: GObject.GType = spec.value_type
+			const prop: PropertyDescriptor<any, any> | undefined = property_descriptors[key]
 			let kind: "int32" | "uint32" | "double" | undefined
-			switch (type) {
+			switch (spec.value_type) {
 				case GObject.TYPE_INT: kind = "int32"; break
 				case GObject.TYPE_UINT: kind = "uint32"; break
 				case GObject.TYPE_DOUBLE: kind = "double"; break
 			}
-			if (kind) {
-				const defaults = num_sizes_and_spec.get(kind)
-				const min = property_descriptors[key]?.min ?? defaults.min
-				const max = property_descriptors[key]?.max ?? defaults.max
-				const is_double = kind === "double"
-				get = function (): number {
-					const val: number | undefined = desc.get?.call?.(this)
-					if (val === null || val === undefined) {
-						const def: number = spec.get_default_value() as number
-						if (def > max) return max
-						if (def < min) return min
-						return def
-					}
-					return val
-				}
-				set = function (val): void {
-					if (val > max) {
-						val = max
-					} else if (val < min) {
-						val = min
-					}
-					if (!is_double) {
-						val = Math.trunc(val)
-					}
-					desc.set?.call?.(this, val)
-				}
-			} else {
-				get = function (this: T): any {
-					return desc.get?.call?.(this) ?? spec.get_default_value() ?? null
-				}
-				set = function (val): void {
-					desc.set?.call?.(this, val ?? null)
-				}
-			}
+			const accessors = (kind
+				? make_numeric_accessors(spec, desc, kind, prop)
+				: make_non_numeric_accessors(spec, desc, key, target.name, prop)
+			)
 			Object.defineProperty(prototype, key, {
 				configurable: desc.configurable ?? true,
 				enumerable: desc.enumerable ?? true,
-				get,
-				set,
+				...accessors,
 			})
 		}
 	}
