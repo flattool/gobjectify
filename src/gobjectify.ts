@@ -179,7 +179,7 @@ function from<
 type ReadyFunc = { _ready?: ()=> (void | Promise<void>) }
 
 const on_error = (class_name: string, e: unknown): void => {
-	print(`Error in $ready function for ${class_name}`)
+	print(`Error in _ready function for ${class_name}`)
 	print(e)
 }
 
