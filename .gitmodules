@@ -1,3 +1,4 @@
 [submodule "gir-ts-types"]
 	path = gir-ts-types
 	url = https://github.com/flattool/gir-ts-types.git
+	branch = sdk-v50
