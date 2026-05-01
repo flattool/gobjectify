@@ -21,14 +21,16 @@ type ExtractActions<D> = {
  * `from()` and `GClass` will see this descriptor and connect up the action to the instance on instantiation.
  *
  * @param params Optional parameters for the SimpleAction. See `new Gio.SimpleAction()` constructor parameters
+ * 
+ * Note that `params.accels` is only used for classes extending Gtk.Application, it is ignored for all other base types.
  *
  * @example
  * ```ts
  * @GClass()
  * class MyBox extends from(Gtk.Box, {
- *     some_action(),
+ *     save_changes: SimpleAction({ accels: ["<Ctrl>S"] }),
  * }) {}
- * // MyBox instances now have a `some_action` GioSimpleAction available
+ * // MyBox instances now have a `save_changes` GioSimpleAction available
  * ```
  */
 function SimpleAction(params?: ActionArgs & { accels?: string[] }): ActionDescriptor {

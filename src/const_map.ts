@@ -10,7 +10,7 @@ export class ConstMap<const Pairs extends [any, any][]> {
 	}
 
 	/**
-     * Get a value from the map that corresponds to the key.
+     * Get the value from the map that corresponds to the key.
      *
      * This is similar to `Map.prototype.get`, but is fully typed as always returning a value, since it knows
      * what is and isn't allowed to be "gotten".
@@ -22,9 +22,9 @@ export class ConstMap<const Pairs extends [any, any][]> {
 	}
 
 	/**
-     * Get a value from the map that might corrosion to the key.
+     * Get a value from the map that might correspond to the key.
      *
-     * This is similar to `Map.prototype.get`, but allows any type of key. The returned value is `undefined` if the
+     * This is similar to `ConstMap.prototype.get`, but allows any type of key. The returned value is `undefined` if the
      * key is not present in the map.
      *
      * @param key

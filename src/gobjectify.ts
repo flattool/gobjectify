@@ -275,7 +275,7 @@ const make_non_numeric_accessors = (
  * ```ts
  * @GClass({ css_name: "my-widget", template: "resource:///org/my/app/ui/my_widget.ui" })
  * class MyWidget extends from(Gtk.Box, {
- *     title: Property.string({ default: "My Awesome Widget", flags: "CONSTRUCT" }),
+ *     title: Property.string({ default: "My Awesome Widget" }),
  * }) {
  *     _ready() {
  *         print(`${this.title} is ready!`)
@@ -288,6 +288,9 @@ const make_non_numeric_accessors = (
  * If provided, the `_ready` is called once synchronously during initialization, after template children
  * have been bound. At this point, `CONSTRUCT` and `CONSTRUCT_ONLY` properties are guaranteed to be
  * set, but `READWRITE` properties set by GtkBuilder may not yet be available.
+ * 
+ * All properties defined with GObjectify's Property are marked as `CONSTRUCT` properties,
+ * so they are guaranteed to be set before `_ready` is called.
  */
 function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 	return function (target: GClassFor<T & ReadyFunc>, _context: ClassDecoratorContext): void {
@@ -548,15 +551,17 @@ function Debounce<T extends GObject.Object, U extends (this: T, ...args: any[])=
  *
  * @example
  * ```ts
- * class MyWidget extends Gtk.Box {
+ * class MyWidget extends from(Gtk.Box, {
+ *     count_value: Property.double(),
+ * }) {
  *     private __count = 0
  *
- *     get count_value(): number {
+ *     override get count_value(): number {
  *         return this.__count
  *     }
  *
  *     @Notify
- *     set count_value(val: number) {
+ *     override set count_value(val: number) {
  *         print(`Setting count_value to ${val}`)
  *         this.__count = val
  *     }
@@ -648,13 +653,9 @@ function OnSimpleAction<
 /**
  * Decorator that connects a method to one or more GObject property change notifications.
  *
- * When applied to a class method, `WatchProp("prop_name")` ensures that the method is
- * automatically connected to `"notify::prop-name"` for the given property on each instance.
- *
- * If the property is declared with `CONSTRUCT` or `CONSTRUCT_ONLY` flags (see `from` for how to add properties),
- * the method will also be called once immediately during initialization, after template children have been bound.
- * For properties declared with the `READWRITE` flag (default), the method is only called when the property
- * changes post-construction.
+ * When applied to a class method, the method will be called immediately in initialization,
+ * and then automatically connected to the `notify::prop-name` signal for the specified property,
+ * which will cause the function to be ran whenever the property's value changes.
  *
  * Multiple `@WatchProp` decorators can be stacked on a single method to watch several properties.
  *
@@ -664,11 +665,11 @@ function OnSimpleAction<
  * ```ts
  * @GClass()
  * class MyButton extends from(Gtk.Box, {
- *     header_title: Property.string({ flags: "CONSTRUCT" }),
+ *     header_title: Property.string(),
  * }) {
  *     @WatchProp("header_title")
  *     #on_header_title_changed(): void {
- *         print("title is now", this.header_title)
+ *         print("title is:", this.header_title)
  *     }
  * }
  * ```
@@ -679,18 +680,12 @@ function OnSimpleAction<
  * distinction. Property names must be valid, registered GObject properties.
  * Plain JavaScript fields are *not valid* and will *cause errors*.
  */
-function WatchProp<
-	T extends GObject.Object,
-	K extends WatchPropKeys<T>
->(prop_name: K) {
+function WatchProp<T extends GObject.Object, K extends WatchPropKeys<T>>(prop_name: K) {
 	const kebab: string = prop_name.replaceAll("_", "-")
 	return (target: (this: T) => any, context: ClassMethodDecoratorContext<T>): void => {
 		context.addInitializer(function (this: T): void {
-			const spec: GObject.ParamSpec = GObject.Object.find_property.call(this.constructor, kebab)
+			target.call(this)
 			this.connect(`notify::${kebab}`, target.bind(this))
-			if ((spec.flags & GObject.ParamFlags.CONSTRUCT) || (spec.flags & GObject.ParamFlags.CONSTRUCT_ONLY)) {
-				target.call(this)
-			}
 		})
 	}
 }
@@ -725,7 +720,7 @@ async function next_idle(): Promise<void> {
  *
  * @example
  * await timeout_ms(500)
- * print("Runs after 500 milliseconds!")
+ * print("It has been 500 milliseconds!")
  */
 async function timeout_ms(duration: number): Promise<void> {
 	return new Promise((resolve, _reject) => GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, duration, () => {
