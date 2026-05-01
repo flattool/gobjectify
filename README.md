@@ -168,3 +168,29 @@ GObjectify also includes a number of small but powerful, advanced tools to make 
 - **Self signal connections** `@OnSignal("signal-name")` on methods to run that method when a signal on the instance is emitted
 - **Automatic notifications**: `@Notify` on setters triggers GObject property notifications automatically
 - **Async signal handling**: `connect_async` to `await` signals like promises, avoiding messy callbacks
+
+# Building from Source
+
+Ensure you have [NPM](https://www.npmjs.com/) installed, as GObjectify utilizes [Rollup](https://www.npmjs.com/package/rollup) to compile into one `.js` file and one `.d.ts` file.
+
+### 1. Clone this repo and enter it:
+```sh
+git clone https://github.com/flattool/gobjectify
+cd gobjectify
+```
+
+### 2. Clone the required types submodule
+```sh
+git submodule update --init --recursive
+```
+
+### 3. Install the needed NPM dependencies
+```sh
+npm install
+```
+
+### 4. Build and bundle into the dual file release
+```sh
+npm run build
+```
+This will create `dist/gobjectify.js` and `dist/gobjectify.d.ts`
