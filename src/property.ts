@@ -115,6 +115,9 @@ const primitive_property = (kind: "int32" | "uint32" | "double") => {
 		const min = config?.min ?? range_and_spec.min
 		const max = config?.max ?? range_and_spec.max
 		const default_val = config?.default ?? (0 >= min && 0 <= max ? 0 : min)
+		if (default_val < min || default_val > max) {
+			throw new RangeError(`Default value ${default_val} is out of range for property of type ${kind} with min ${min} and max ${max}`)
+		}
 		return {
 			property_symbol: PROPERTY_SYMBOL,
 			min,
@@ -126,64 +129,10 @@ const primitive_property = (kind: "int32" | "uint32" | "double") => {
 	}
 }
 
-/**
- * Creates a number property descriptor with the underlying GObject type for use with `from` and `GClass`.
- *
- * @param config Additional configuration for the property
- * @param config.default Initial value of this field when an instance is constructed
- * @param config.nick Nickname for this property
- * @param config.blurb Description for this property
- * @param config.flags Strings representing GObject.ParamFlags
- * - `"CONSTANT"` -> `READABLE`
- * - `"READWRITE"` -> `READWRITE`
- * - `"CONSTRUCT"` -> `READWRITE | CONSTRUCT`
- * - `"CONSTRUCT_ONLY"` -> `READWRITE | CONSTRUCT_ONLY`
- */
 const int32 = primitive_property("int32")
-
-/**
- * Creates a number property descriptor with the underlying GObject type for use with `from` and `GClass`.
- *
- * @param config Additional configuration for the property
- * @param config.default Initial value of this field when an instance is constructed
- * @param config.nick Nickname for this property
- * @param config.blurb Description for this property
- * @param config.flags Strings representing GObject.ParamFlags
- * - `"CONSTANT"` -> `READABLE`
- * - `"READWRITE"` -> `READWRITE`
- * - `"CONSTRUCT"` -> `READWRITE | CONSTRUCT`
- * - `"CONSTRUCT_ONLY"` -> `READWRITE | CONSTRUCT_ONLY`
- */
 const uint32 = primitive_property("uint32")
-
-/**
- * Creates a number property descriptor with the underlying GObject type for use with `from` and `GClass`.
- *
- * @param config Additional configuration for the property
- * @param config.default Initial value of this field when an instance is constructed
- * @param config.nick Nickname for this property
- * @param config.blurb Description for this property
- * @param config.flags Strings representing GObject.ParamFlags
- * - `"CONSTANT"` -> `READABLE`
- * - `"READWRITE"` -> `READWRITE`
- * - `"CONSTRUCT"` -> `READWRITE | CONSTRUCT`
- * - `"CONSTRUCT_ONLY"` -> `READWRITE | CONSTRUCT_ONLY`
- */
 const double = primitive_property("double")
 
-/**
- * Creates a string property descriptor for use with `from` and `GClass`.
- *
- * @param config Additional configuration for the property
- * @param config.default Initial value of this field when an instance is constructed
- * @param config.nick Nickname for this property
- * @param config.blurb Description for this property
- * @param config.flags Strings representing GObject.ParamFlags
- * - `"CONSTANT"` -> `READABLE`
- * - `"READWRITE"` -> `READWRITE`
- * - `"CONSTRUCT"` -> `READWRITE | CONSTRUCT`
- * - `"CONSTRUCT_ONLY"` -> `READWRITE | CONSTRUCT_ONLY`
- */
 const string = <const C extends StringConfig>(
 	config?: C,
 ): PropertyDescriptor<string, FlagsFrom<C>> & Castable<string, C> => {
@@ -200,19 +149,6 @@ const string = <const C extends StringConfig>(
 	}
 }
 
-/**
- * Creates a boolean property descriptor for use with `from` and `GClass`.
- *
- * @param config Additional configuration for the property
- * @param config.default Initial value of this field when an instance is constructed
- * @param config.nick Nickname for this property
- * @param config.blurb Description for this property
- * @param config.flags Strings representing GObject.ParamFlags
- * - `"CONSTANT"` -> `READABLE`
- * - `"READWRITE"` -> `READWRITE`
- * - `"CONSTRUCT"` -> `READWRITE | CONSTRUCT`
- * - `"CONSTRUCT_ONLY"` -> `READWRITE | CONSTRUCT_ONLY`
- */
 const bool = <const C extends BoolConfig>(
 	config?: C,
 ): PropertyDescriptor<boolean, FlagsFrom<C>> & Castable<boolean, C> => {
@@ -229,22 +165,6 @@ const bool = <const C extends BoolConfig>(
 	}
 }
 
-/**
- * Creates a GObject.Object property descriptor for use with `from` and `GClass`.
- *
- * All GObject.Object properties are also nullable, because GObject cannot ensure that a null value isn't set.
- * The default value for GObject.Object properties is null, and cannot be changed.
- *
- * @param kind The GObject class that this property will be typed too
- * @param config Additional configuration for the property
- * @param config.nick Nickname for this property
- * @param config.blurb Description for this property
- * @param config.flags Strings representing GObject.ParamFlags
- * - `"CONSTANT"` -> `READABLE`
- * - `"READWRITE"` -> `READWRITE`
- * - `"CONSTRUCT"` -> `READWRITE | CONSTRUCT`
- * - `"CONSTRUCT_ONLY"` -> `READWRITE | CONSTRUCT_ONLY`
- */
 const gobject = <G extends GClass, C extends BaseConfig>(kind: G, config?: C): PropertyDescriptor<
 	InstanceType<G> | null,
 	FlagsFrom<C>
@@ -285,22 +205,9 @@ const gobject = <G extends GClass, C extends BaseConfig>(kind: G, config?: C): P
 	}
 }
 
-/**
- * Creates a GObject Enum property descriptor for use with `from` and `GClass`.
- *
- * @param kind The GObject Enum class that this property will be typed too
- * @param config Additional configuration for the property
- * @param config.default Initial value of this field when an instance is constructed
- * @param config.nick Nickname for this property
- * @param config.blurb Description for this property
- * @param config.flags Strings representing GObject.ParamFlags
- * - `"CONSTANT"` -> `READABLE`
- * - `"READWRITE"` -> `READWRITE`
- * - `"CONSTRUCT"` -> `READWRITE | CONSTRUCT`
- * - `"CONSTRUCT_ONLY"` -> `READWRITE | CONSTRUCT_ONLY`
- */
-const genum = <G extends number, C extends DefaultableConfig<G>>(
+const genum = <G extends number, C extends BaseConfig>(
 	kind: GEnum<G>,
+	default_value: G,
 	config?: C,
 ): PropertyDescriptor<G, FlagsFrom<C>> => {
 	const nick: string | null = config?.nick || null
@@ -311,25 +218,10 @@ const genum = <G extends number, C extends DefaultableConfig<G>>(
 		min: undefined,
 		max: undefined,
 		flags: config?.flags ?? DEFAULT_FLAG as any,
-		create: (name) => GObject.ParamSpec.enum(name, nick, blurb, flags, kind, config?.default ?? null),
+		create: (name) => GObject.ParamSpec.enum(name, nick, blurb, flags, kind, default_value),
 	}
 }
 
-/**
- * Creates a JavaScript object property descriptor for use with `from` and `GClass`.
- *
- * All JS object properties are also nullable, because GObject cannot ensure that a null value isn't set.
- * The default value for JS object properties is null, and cannot be changed.
- *
- * @param config Additional configuration for the property
- * @param config.nick Nickname for this property
- * @param config.blurb Description for this property
- * @param config.flags Strings representing GObject.ParamFlags
- * - `"CONSTANT"` -> `READABLE`
- * - `"READWRITE"` -> `READWRITE`
- * - `"CONSTRUCT"` -> `READWRITE | CONSTRUCT`
- * - `"CONSTRUCT_ONLY"` -> `READWRITE | CONSTRUCT_ONLY`
- */
 const jsobject = <C extends BaseConfig>(config?: C): PropertyDescriptor<{} | null, FlagsFrom<C>> & {
 	/**
 	 * Type helper to allow narrowing of property descriptors' types
@@ -371,6 +263,133 @@ const is_property_descriptor = (item: any): item is PropertyDescriptor<any, Para
 	item?.property_symbol === PROPERTY_SYMBOL
 )
 
-const Property = { int32, uint32, double, string, bool, jsobject, gobject, genum } as const
+/**
+ * Object containing functions for creating GObject property descriptors,to be used with `from()` and `GClass`.
+ * Each function corresponds to a different type of property, and accepts an optional configuration object to set details about the property.
+ * See each function for details.
+ * 
+ * Every property made through this is marked as GObject.ParamFlags.CONSTRUCT, meaning their initial values will be available during construction and _ready.
+ */
+const Property = {
+	/**
+	 * Creates a number property descriptor, known to GObject as an int32, for use with `from` and `GClass`.
+	 * The largest possible range for this property is that of a signed 32-bit integer, but this can be reduced with the `min` and `max` config options.
+	 *
+	 * @param config Additional configuration for the property
+	 * @param config.default Initial value of this field when an instance is constructed, defaults to `0` or `min` if `0` is out of range
+	 * @param config.min Minimum allowed value. Defaults to `MIN_INT32`
+	 * @param config.max Maximum allowed value. Defaults to `MAX_INT32`
+	 * @param config.nick Nickname for this property
+	 * @param config.blurb Description for this property
+	 * @param config.flags Controls the mutability of the property on the instance, with the following options:
+	 * - `"readwrite"` (default) -> Readable and writeable at all times.
+	 * - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	 * - `"const"` -> Read-only. It cannot be set at any point. To change the value, use the `default` config option.
+	*/
+	int32,
+	/**
+	 * Creates a number property descriptor, known to GObject as a uint32, for use with `from` and `GClass`.
+	 * The largest possible range for this property is that of an unsigned 32-bit integer, but this can be reduced with the `min` and `max` config options.
+	 *
+	 * @param config Additional configuration for the property
+	 * @param config.default Initial value of this field when an instance is constructed, defaults to `0` or `min` if `0` is out of range
+	 * @param config.min Minimum allowed value. Defaults to `0`
+	 * @param config.max Maximum allowed value. Defaults to `MAX_UINT32`
+	 * @param config.nick Nickname for this property
+	 * @param config.blurb Description for this property
+	 * @param config.flags Controls the mutability of the property on the instance, with the following options:
+	 * - `"readwrite"` (default) -> Readable and writeable at all times.
+	 * - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	 * - `"const"` -> Read-only. It cannot be set at any point. To change the value, use the `default` config option.
+	*/
+	uint32,
+	/**
+	 * Creates a number property descriptor, known to GObject as a double, for use with `from` and `GClass`.
+	 * The largest possible range for this property is that of a double, but this can be reduced with the `min` and `max` config options.
+	 *
+	 * @param config Additional configuration for the property
+	 * @param config.default Initial value of this field when an instance is constructed, defaults to `0` or `min` if `0` is out of range
+	 * @param config.min Minimum allowed value. Defaults to `-Number.MAX_VALUE`
+	 * @param config.max Maximum allowed value. Defaults to `Number.MAX_VALUE`
+	 * @param config.nick Nickname for this property
+	 * @param config.blurb Description for this property
+	 * @param config.flags Controls the mutability of the property on the instance, with the following options:
+	 * - `"readwrite"` (default) -> Readable and writeable at all times.
+	 * - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	 * - `"const"` -> Read-only. It cannot be set at any point. To change the value, use the `default` config option.
+	*/
+	double,
+	/**
+	 * Creates a string property descriptor for use with `from` and `GClass`.
+	 *
+	 * @param config Additional configuration for the property
+	 * @param config.default Initial value of this field when an instance is constructed, defaults to "" (an empty string)
+	 * @param config.nick Nickname for this property
+	 * @param config.blurb Description for this property
+	 * @param config.flags Controls the mutability of the property on the instance, with the following options:
+	 * - `"readwrite"` (default) -> Readable and writeable at all times.
+	 * - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	 * - `"const"` -> Read-only. It cannot be set at any point. To change the value, use the `default` config option.
+	 */
+	string,
+	/**
+	 * Creates a boolean property descriptor for use with `from` and `GClass`.
+	 *
+	 * @param config Additional configuration for the property
+	 * @param config.default Initial value of this field when an instance is constructed, defaults to false
+	 * @param config.nick Nickname for this property
+	 * @param config.blurb Description for this property
+	 * @param config.flags Controls the mutability of the property on the instance, with the following options:
+	 * - `"readwrite"` (default) -> Readable and writeable at all times.
+	 * - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	 * - `"const"` -> Read-only. It cannot be set at any point. To change the value, use the `default` config option.
+	 */
+	bool,
+	/**
+	 * Creates a GObject.Object property descriptor for use with `from` and `GClass`.
+	 *
+	 * All GObject.Object properties are also nullable, because GObject cannot ensure that a null value isn't set.
+	 * The default value for GObject.Object properties is null, and cannot be changed.
+	 *
+	 * @param kind The GObject class that this property will be typed too
+	 * @param config Additional configuration for the property
+	 * @param config.nick Nickname for this property
+	 * @param config.blurb Description for this property
+	 * @param config.flags Controls the mutability of the property on the instance, with the following options:
+	 * - `"readwrite"` (default) -> Readable and writeable at all times.
+	 * - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	 * - `"const"` -> Not meaningful for object properties, as the default is always `null` and cannot be changed. Prefer `"readonly"` if you want a set-once property.
+	*/
+	gobject,
+	/**
+	 * Creates a GObject Enum property descriptor for use with `from` and `GClass`.
+	*
+	* @param kind The GObject Enum class that this property will be typed to
+	* @param config Additional configuration for the property
+	* @param config.default Initial value of this field when an instance is constructed, defaults to 0 (which may not be a valid value for the enum type)
+	* @param config.nick Nickname for this property
+	* @param config.blurb Description for this property
+	* @param config.flags Controls the mutability of the property on the instance, with the following options:
+	* - `"readwrite"` (default) -> Readable and writeable at all times.
+	* - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	* - `"const"` -> Read-only. It cannot be set at any point. To change the value, use the `default` config option.
+	*/
+	genum,
+	/**
+	 * Creates a JavaScript object property descriptor for use with `from` and `GClass`.
+	*
+	* All JS object properties are also nullable, because GObject cannot ensure that a null value isn't set.
+	* The default value for JS object properties is null, and cannot be changed.
+	*
+	* @param config Additional configuration for the property
+	* @param config.nick Nickname for this property
+	* @param config.blurb Description for this property
+	* @param config.flags Controls the mutability of the property on the instance, with the following options:
+	* - `"readwrite"` (default) -> Readable and writeable at all times.
+	* - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	* - `"const"` -> Not meaningful for object properties, as the default is always `null` and cannot be changed. Prefer `"readonly"` if you want a set-once property.
+	*/
+	jsobject,
+} as const
 export { Property, is_property_descriptor, num_sizes_and_spec }
 export type { PropertyDescriptor, ExtractWriteableProps, ExtractReadonlyProps, ExtractConstructProps }
