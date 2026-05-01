@@ -33,7 +33,7 @@ Here is an example:
 @Signal("some-signal")
 export class MyWidget extends from(Gtk.Box, {
   _button: Child<Gtk.Button>(),
-  title: Property.string({ default: "Hello", flags: "CONSTRUCT" }),
+  title: Property.string({ default: "Hello" }),
   click: SimpleAction(),
 }) {
   _ready(): void {
@@ -112,10 +112,7 @@ The GClass decorator is the other half of the magic; It tells GObject to registe
 // This code is continued in the same file from Step 1
 import { GClass, OnSimpleAction } from "./gobjectify/gobjectify.js"
 
-@GClass({
-  template: "resource:///org/example/ui/my_widget.ui",
-  css_name: "my-widget",
-})
+@GClass({ template: "resource:///org/example/ui/my_widget.ui" })
 export class MyWidget extends Base {
   @OnSimpleAction("activate")
   #do_activate(): void {
@@ -142,7 +139,7 @@ GObjectify automatically:
 ```ts
 @GClass({ template: "resource:///org/example/ui/my_widget.ui" })
 export class MainWindow extends from(Gtk.ApplicationWindow, {
-  count: Property.uint32({ flags: "CONSTRUCT" }),
+  count: Property.uint32(),
   _increment_btn: Child<Gtk.Button>(),
   _decrement_btn: Child<Gtk.Button>(),
   _count_lbl: Child<Gtk.Label>(),
@@ -159,7 +156,7 @@ export class MainWindow extends from(Gtk.ApplicationWindow, {
 }
 ```
 
-Here, GObjectify registers the class with a UI template, binds the internal widgets, creates the GObject properties, binds the `on_count_change` function to the notify signal for `count`, and will run the `_ready()` function (which handles our button click connections).
+Here, GObjectify registers the class with a UI template, binds the internal widgets, creates the GObject properties, binds the `on_count_change` function to the notify signal for `count`, and, instance initialization time, will run `on_count_change` and `_ready()` (which handles our button click connections).
 
 Tip: Using UI bound properties can reduce this code even more! (Not demonstrated here, as UI files are out of GObjectify's scope, other than registering templates)
 
