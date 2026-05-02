@@ -178,7 +178,7 @@ function from<
 
 type ReadyFunc = { _ready?: ()=> (void | Promise<void>) }
 
-const on_error = (class_name: string, e: unknown): void => {
+const on_ready_error = (class_name: string, e: unknown): void => {
 	print(`Error in _ready function for ${class_name}`)
 	print(e)
 }
@@ -245,6 +245,12 @@ const make_non_numeric_accessors = (
 		set,
 	}
 }
+
+const numeric_kind_from_gtype = new Map<GObject.GType, "int32" | "uint32" | "double">([
+	[GObject.TYPE_INT, "int32"],
+	[GObject.TYPE_UINT, "uint32"],
+	[GObject.TYPE_DOUBLE, "double"],
+])
 
 /**
  * Class decorator to define a GObject/Gtk class with properties, children, actions, and signals.
@@ -383,13 +389,17 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 			// makes "readonly" flagged properties throw when set after this point
 			this[INIT_FINISHED_SYMBOL] = true
 
-			if (typeof (this as any)._ready === "function") {
-				try {
-					const return_val = (this as any)._ready()
-					if (return_val instanceof Promise) return_val.catch(on_error.bind(null, target.name))
-				} catch (e) {
-					on_error(target.name, e)
-				}
+			const ready = prototype._ready
+			if (typeof ready === "function") {
+				GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+					try {
+						const return_val = prototype._ready.call(this)
+						if (return_val instanceof Promise) return_val.catch(on_ready_error.bind(null, target.name))
+					} catch (e) {
+						on_ready_error(target.name, e)
+					}
+					return GLib.SOURCE_REMOVE
+				})
 			}
 
 			return original_return_val
@@ -421,12 +431,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				`)
 			}
 			const prop: PropertyDescriptor<any, any> | undefined = property_descriptors[key]
-			let kind: "int32" | "uint32" | "double" | undefined
-			switch (spec.value_type) {
-				case GObject.TYPE_INT: kind = "int32"; break
-				case GObject.TYPE_UINT: kind = "uint32"; break
-				case GObject.TYPE_DOUBLE: kind = "double"; break
-			}
+			const kind: "int32" | "uint32" | "double" | undefined = numeric_kind_from_gtype.get(spec.value_type)
 			const accessors = (kind
 				? make_numeric_accessors(spec, desc, kind, prop)
 				: make_non_numeric_accessors(spec, desc, key, target.name, prop)
@@ -516,7 +521,6 @@ function Debounce<T extends GObject.Object, U extends (this: T, ...args: any[])=
 			if ((this as any)[timeout_symbol]) {
 				GLib.source_remove((this as any)[timeout_symbol])
 			}
-			// @ts-ignore - sdk-v50 types believe an extra argument is required, but passing one results in too many arguments`	
 			(this as any)[timeout_symbol] = GLib.timeout_add(
 				GLib.PRIORITY_DEFAULT,
 				milliseconds,
@@ -702,7 +706,6 @@ function WatchProp<T extends GObject.Object, K extends WatchPropKeys<T>>(prop_na
  * print("Runs at the next idle cycle!")
  */
 async function next_idle(): Promise<void> {
-	// @ts-ignore - sdk-v50 types believe an extra argument is required, but passing one results in too many arguments
 	return new Promise((resolve, _reject) => GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
 		resolve()
 		return GLib.SOURCE_REMOVE
@@ -725,7 +728,6 @@ async function next_idle(): Promise<void> {
  */
 async function timeout_ms(duration: number): Promise<void> {
 	return new Promise((resolve, _reject) => {
-		// @ts-ignore - sdk-v50 types believe an extra argument is required, but passing one results in too many arguments
 		GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, duration, () => {
 			resolve()
 			return GLib.SOURCE_REMOVE
