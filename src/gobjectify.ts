@@ -702,10 +702,11 @@ function WatchProp<T extends GObject.Object, K extends WatchPropKeys<T>>(prop_na
  * print("Runs at the next idle cycle!")
  */
 async function next_idle(): Promise<void> {
+	// @ts-ignore - sdk-v50 types believe an extra argument is required, but passing one results in too many arguments
 	return new Promise((resolve, _reject) => GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
 		resolve()
 		return GLib.SOURCE_REMOVE
-	}, null))
+	}))
 }
 
 /**
