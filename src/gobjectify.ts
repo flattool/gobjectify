@@ -367,7 +367,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 					accel_setter = this.set_accels_for_action.bind(this)
 				} else if (this instanceof Gtk.Widget) {
 					action_addable = ((this as any)[ACTION_GROUP_SYMBOL] ??= new Gio.SimpleActionGroup())
-					this.insert_action_group(target.name, action_addable)
+					this.insert_action_group(target.name, action_addable!)
 				}
 
 				if (action_addable !== undefined) {
@@ -383,10 +383,9 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 			// makes "readonly" flagged properties throw when set after this point
 			this[INIT_FINISHED_SYMBOL] = true
 
-			const ready = prototype._ready
-			if (typeof ready === "function") {
+			if (typeof (this as any)._ready === "function") {
 				try {
-					const return_val = ready.call(this)
+					const return_val = (this as any)._ready()
 					if (return_val instanceof Promise) return_val.catch(on_error.bind(null, target.name))
 				} catch (e) {
 					on_error(target.name, e)
@@ -517,6 +516,7 @@ function Debounce<T extends GObject.Object, U extends (this: T, ...args: any[])=
 			if ((this as any)[timeout_symbol]) {
 				GLib.source_remove((this as any)[timeout_symbol])
 			}
+			// @ts-ignore - sdk-v50 types believe an extra argument is required, but passing one results in too many arguments`	
 			(this as any)[timeout_symbol] = GLib.timeout_add(
 				GLib.PRIORITY_DEFAULT,
 				milliseconds,
@@ -705,7 +705,7 @@ async function next_idle(): Promise<void> {
 	return new Promise((resolve, _reject) => GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
 		resolve()
 		return GLib.SOURCE_REMOVE
-	}))
+	}, null))
 }
 
 /**
@@ -723,10 +723,13 @@ async function next_idle(): Promise<void> {
  * print("It has been 500 milliseconds!")
  */
 async function timeout_ms(duration: number): Promise<void> {
-	return new Promise((resolve, _reject) => GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, duration, () => {
-		resolve()
-		return GLib.SOURCE_REMOVE
-	}))
+	return new Promise((resolve, _reject) => {
+		// @ts-ignore - sdk-v50 types believe an extra argument is required, but passing one results in too many arguments
+		GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, duration, () => {
+			resolve()
+			return GLib.SOURCE_REMOVE
+		})
+	})
 }
 
 /**
