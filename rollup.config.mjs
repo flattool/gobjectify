@@ -54,7 +54,7 @@ export default [
         output: {
             file: `${output_dir}/gobjectify.d.ts`,
             format: "esm",
-            banner,
+            banner: banner + "\n// @ts-nocheck - Skip checking, to ensure this library wont cause issues for users with different TypeScript setups.",
         },
         plugins: [
             dts({
