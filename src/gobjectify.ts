@@ -326,6 +326,28 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 					property_descriptors[name] = value
 					const spec = value.create(name)
 					properties[name] = spec
+
+					const is_flagged_computed: boolean = value.flags === "computed"
+					const has_get_or_set: boolean = (
+						typeof (Object.getOwnPropertyDescriptor(prototype, name)?.get) === "function"
+						|| typeof (Object.getOwnPropertyDescriptor(prototype, name)?.set) === "function"
+					)
+					if (is_flagged_computed && !has_get_or_set) {
+						// Error when a computed flagged property does not have a user-provided getter and setter
+						throw new Error(dedent`
+							GClass: ${target.name},
+							"computed" flagged property '${name}' is missing a getter or a setter function.
+						`)
+					}
+					if (!is_flagged_computed && has_get_or_set) {
+						// Error when a non-computed flagged property has a user-provided getter and setter
+						throw new Error(dedent`
+							GClass: ${target.name},
+							Non-"computed" flagged property '${name}' has a getter or a setter function.
+							To use a custom getter and setter, flag this property as "computed".
+						`)
+					}
+
 					if (
 						(spec.flags & GObject.ParamFlags.READABLE)
 						&& !(spec.flags & GObject.ParamFlags.WRITABLE)

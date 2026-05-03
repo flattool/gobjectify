@@ -8,6 +8,7 @@ type GEnum<T extends number = number> = { $gtype: GObject.GType<T> } & { new?: n
 const FLAG_PRESETS = {
 	readwrite: GObject.ParamFlags.CONSTRUCT | GObject.ParamFlags.READWRITE,
 	readonly: GObject.ParamFlags.CONSTRUCT | GObject.ParamFlags.READWRITE, // Will be treated by GObjectify as readonly post-init
+	computed: GObject.ParamFlags.READWRITE, // CONSTRUCT removed so that `override get` and `override set` will work
 	const: GObject.ParamFlags.READABLE,
 } as const
 
@@ -73,7 +74,7 @@ type Castable<WideType, Config extends DefaultableConfig<WideType>> = {
 }
 
 type ExtractWriteableProps<D> = {
-	[Key in keyof D as D[Key] extends PropertyDescriptor<any, "readwrite">
+	[Key in keyof D as D[Key] extends PropertyDescriptor<any, "computed" | "readwrite">
 		? Key
 		: never
 	]: D[Key] extends PropertyDescriptor<infer T, any> ? T : never
@@ -284,6 +285,7 @@ const Property = {
 	 * @param config.flags Controls the mutability of the property on the instance, with the following options:
 	 * - `"readwrite"` (default) -> Readable and writeable at all times.
 	 * - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	 * - `"computed"` -> Allows for defining getters and setters for custom computed properties. Property will *NOT* be available during construction or init.
 	 * - `"const"` -> Read-only. It cannot be set at any point. To change the value, use the `default` config option.
 	*/
 	int32,
@@ -300,6 +302,7 @@ const Property = {
 	 * @param config.flags Controls the mutability of the property on the instance, with the following options:
 	 * - `"readwrite"` (default) -> Readable and writeable at all times.
 	 * - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	 * - `"computed"` -> Allows for defining getters and setters for custom computed properties. Property will *NOT* be available during construction or init.
 	 * - `"const"` -> Read-only. It cannot be set at any point. To change the value, use the `default` config option.
 	*/
 	uint32,
@@ -316,6 +319,7 @@ const Property = {
 	 * @param config.flags Controls the mutability of the property on the instance, with the following options:
 	 * - `"readwrite"` (default) -> Readable and writeable at all times.
 	 * - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	 * - `"computed"` -> Allows for defining getters and setters for custom computed properties. Property will *NOT* be available during construction or init.
 	 * - `"const"` -> Read-only. It cannot be set at any point. To change the value, use the `default` config option.
 	*/
 	double,
@@ -329,6 +333,7 @@ const Property = {
 	 * @param config.flags Controls the mutability of the property on the instance, with the following options:
 	 * - `"readwrite"` (default) -> Readable and writeable at all times.
 	 * - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	 * - `"computed"` -> Allows for defining getters and setters for custom computed properties. Property will *NOT* be available during construction or init.
 	 * - `"const"` -> Read-only. It cannot be set at any point. To change the value, use the `default` config option.
 	 */
 	string,
@@ -342,6 +347,7 @@ const Property = {
 	 * @param config.flags Controls the mutability of the property on the instance, with the following options:
 	 * - `"readwrite"` (default) -> Readable and writeable at all times.
 	 * - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	 * - `"computed"` -> Allows for defining getters and setters for custom computed properties. Property will *NOT* be available during construction or init.
 	 * - `"const"` -> Read-only. It cannot be set at any point. To change the value, use the `default` config option.
 	 */
 	bool,
@@ -358,6 +364,7 @@ const Property = {
 	 * @param config.flags Controls the mutability of the property on the instance, with the following options:
 	 * - `"readwrite"` (default) -> Readable and writeable at all times.
 	 * - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	 * - `"computed"` -> Allows for defining getters and setters for custom computed properties. Property will *NOT* be available during construction or init.
 	 * - `"const"` -> Not meaningful for object properties, as the default is always `null` and cannot be changed. Prefer `"readonly"` if you want a set-once property.
 	*/
 	gobject,
@@ -372,6 +379,7 @@ const Property = {
 	* @param config.flags Controls the mutability of the property on the instance, with the following options:
 	* - `"readwrite"` (default) -> Readable and writeable at all times.
 	* - `"readonly"` -> May be set during construction, but is read-only post-construction.
+	* - `"computed"` -> Allows for defining getters and setters for custom computed properties. Property will *NOT* be available during construction or init.
 	* - `"const"` -> Read-only. It cannot be set at any point. To change the value, use the `default` config option.
 	*/
 	genum,
@@ -387,7 +395,8 @@ const Property = {
 	* @param config.flags Controls the mutability of the property on the instance, with the following options:
 	* - `"readwrite"` (default) -> Readable and writeable at all times.
 	* - `"readonly"` -> May be set during construction, but is read-only post-construction.
-	* - `"const"` -> Not meaningful for object properties, as the default is always `null` and cannot be changed. Prefer `"readonly"` if you want a set-once property.
+	* - `"computed"` -> Allows for defining getters and setters for custom computed properties. Property will *NOT* be available during construction or init.
+	* - `"const"` -> Not meaningful for jsobject properties, as the default is always `null` and cannot be changed. Prefer `"readonly"` if you want a set-once property.
 	*/
 	jsobject,
 } as const
