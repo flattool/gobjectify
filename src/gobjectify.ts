@@ -391,15 +391,12 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 
 			const ready = prototype._ready
 			if (typeof ready === "function") {
-				GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-					try {
-						const return_val = prototype._ready.call(this)
-						if (return_val instanceof Promise) return_val.catch(on_ready_error.bind(null, target.name))
-					} catch (e) {
-						on_ready_error(target.name, e)
-					}
-					return GLib.SOURCE_REMOVE
-				})
+				try {
+					const return_val = prototype._ready.call(this)
+					if (return_val instanceof Promise) return_val.catch(on_ready_error.bind(null, target.name))
+				} catch (e) {
+					on_ready_error(target.name, e)
+				}
 			}
 
 			return original_return_val
