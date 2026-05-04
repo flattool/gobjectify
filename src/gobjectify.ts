@@ -592,6 +592,7 @@ function Debounce<T extends GObject.Object, U extends (this: T, ...args: any[])=
  *
  * const widget = new MyWidget();
  * widget.count_value = 42; // Automatically calls widget.notify("count-value")
+ * ```
  */
 function Notify<T extends GObject.Object, U>(
 	target: (this: T, arg0: U)=> void,
@@ -629,7 +630,8 @@ function Notify<T extends GObject.Object, U>(
  * }
  * ```
  *
- * // handle_click is automatically called when "clicked" is emitted
+ * @remarks
+ * handle_click is automatically called when "clicked" is emitted
  */
 function OnSignal(signal_name: string) {
 	return <T extends GObject.Object>(
@@ -671,6 +673,44 @@ function OnSimpleAction<
 			(this[action_name] as Gio.SimpleAction).connect("activate", target.bind(this))
 		})
 	}
+}
+
+/**
+ * Decorator that runs a method during construction time after GObject finishes its init.
+ *
+ * When applied to a class method, `OnConstruct` will have the method be ran in the constructor body,
+ * after GObject finishes its initialization logic. The method will have full access to construct
+ * properties, template children, and class field members.
+ * 
+ * The method will be ran synchronously, but supports decorating async methods,
+ * which will be ran as a standard promise.
+ *
+ * @param target The original setter method.
+ * @param context The decorator context.
+ *
+ * @example
+ * ```ts
+ * class MyButton extends Gtk.Button {
+ *     @OnConstruct
+ *     do_init(): void {
+ *         print("a new MyButton has been constructed")
+ *     }
+ * }
+ * ```
+ *
+ * @remarks
+ * when creating a new instance, "a new MyButton has been constructed" is printed during construction
+ */
+function OnConstruct<T extends GObject.Object>(target: (this: T)=> void | Promise<void>, context: ClassMethodDecoratorContext<T>): void {
+	context.addInitializer(function (this: T): void {
+		const result = target.call(this)
+		if (result instanceof Promise) {
+			result.catch((e) => {
+				print(`Error in @OnConstruct async method '${target.name}' on ${this.constructor.name}`)
+				print(e)
+			})
+		}
+	})
 }
 
 /**
@@ -721,8 +761,10 @@ function WatchProp<T extends GObject.Object, K extends WatchPropKeys<T>>(prop_na
  * @returns A promise that resolves on the next GLib idle iteration.
  *
  * @example
+ * ```
  * await next_idle()
  * print("Runs at the next idle cycle!")
+ * ```
  */
 async function next_idle(): Promise<void> {
 	return new Promise((resolve, _reject) => GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
@@ -742,8 +784,10 @@ async function next_idle(): Promise<void> {
  * @returns A promise that resolves after the timeout.
  *
  * @example
+ * ```ts
  * await timeout_ms(500)
  * print("It has been 500 milliseconds!")
+ * ```
  */
 async function timeout_ms(duration: number): Promise<void> {
 	return new Promise((resolve, _reject) => {
@@ -777,13 +821,15 @@ async function timeout_ms(duration: number): Promise<void> {
  * print("Button clicked!")
  *
  * @example
+ * ```ts
  * // Handle a signal that could fail
  * try {
- *   const [result] = await connect_async<[string]>(obj, "success-signal", "error-signal");
- *   print(`Success: ${result}`);
+ *     const [result] = await connect_async<[string]>(obj, "success-signal", "error-signal");
+ *     print(`Success: ${result}`);
  * } catch (err) {
- *   print(`Error signal triggered: ${err.message}`);
+ *     print(`Error signal triggered: ${err.message}`);
  * }
+ * ```
  */
 async function connect_async<Args extends unknown[] = []>(
 	obj: GObject.Object,
@@ -833,6 +879,7 @@ async function connect_async<Args extends unknown[] = []>(
  * // "Hello
  * //     this line is indented relative to the block.
  * // Goodbye!"
+ * ```
  */
 function dedent(strings: TemplateStringsArray, ...values: any[]): string {
 	const full = strings.map((str, index) => str + (index < values.length ? values[index] : "")).join("")
@@ -870,6 +917,7 @@ export {
 	WatchProp,
 	OnSignal,
 	OnSimpleAction,
+	OnConstruct,
 	Property,
 	Child,
 	SimpleAction,
