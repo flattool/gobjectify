@@ -50,24 +50,21 @@ type Descriptor<D, T extends GObject.Object> = {
 type GClassFor<T extends GObject.Object> = new (...args: any[])=> T
 type AbstractGClassFor<T extends GObject.Object> = abstract new (...args: any[])=> T
 
-type ResultingConstructorArgs<
+type ResultingConstructorParamsObj<
 	T extends AbstractGClassFor<GObject.Object>,
-	D extends Descriptor<D, InstanceType<T>>,
-> = Partial<ExtractConstructProps<D> & ExtractWriteableProps<D>>
+	D extends Descriptor<D, InstanceType<T>>
+> = ConstructorParameters<T> extends []
+	? [Partial<ExtractConstructProps<D> & ExtractWriteableProps<D>>]
+	: ConstructorParameters<T> extends [(infer First)?, ...infer Rest]
+		? [Partial<ExtractConstructProps<D> & ExtractWriteableProps<D>> & First, ...Rest]
+		: never
 
 type ResultingClass<
 	T extends AbstractGClassFor<GObject.Object>,
 	D extends Descriptor<D, InstanceType<T>>,
 	I extends AbstractGClassFor<GObject.Object>[],
-> = { $gtype: GObject.GType } & (
-	abstract new (...args: ConstructorParameters<T> extends []
-		? [ResultingConstructorArgs<T, D>]
-		: ConstructorParameters<T> extends [infer First, ...infer Rest]
-			? [ResultingConstructorArgs<T, D> & First, ...Rest]
-			: ConstructorParameters<T> extends [...infer Some]
-				? [ResultingConstructorArgs<T, D> & Some[0]]
-				: never
-	)=> (
+> = { $gtype: GObject.GType, $params: ResultingConstructorParamsObj<T, D>[0] } & (
+	abstract new (...args: ResultingConstructorParamsObj<T, D>)=> (
 		InstanceType<T>
 		& ExtractWriteableProps<D>
 		& ExtractReadonlyProps<D>
@@ -716,11 +713,12 @@ function OnConstruct<T extends GObject.Object>(target: (this: T)=> void | Promis
 /**
  * Decorator that connects a method to one or more GObject property change notifications.
  *
- * When applied to a class method, the method will be called immediately in initialization,
+ * When applied to a class method, the method will be called asynchronously on idle after class initialization,
  * and then automatically connected to the `notify::prop-name` signal for the specified property,
  * which will cause the function to be ran whenever the property's value changes.
  *
- * Multiple `@WatchProp` decorators can be stacked on a single method to watch several properties.
+ * Multiple `@WatchProp` decorators can be stacked on a single method to watch several properties,
+ * however this will call the function multiple times on idle after initialization.
  *
  * @param prop_name The snake_case name of the GObject property to watch.
  *
@@ -747,8 +745,11 @@ function WatchProp<T extends GObject.Object, K extends WatchPropKeys<T>>(prop_na
 	const kebab: string = prop_name.replaceAll("_", "-")
 	return (target: (this: T) => any, context: ClassMethodDecoratorContext<T>): void => {
 		context.addInitializer(function (this: T): void {
-			target.call(this)
 			this.connect(`notify::${kebab}`, target.bind(this))
+			next_idle().then(() => target.call(this)).catch((e) => {
+				print(`Error in @WatchProp method '${target.name}`)
+				print(e)
+			})
 		})
 	}
 }

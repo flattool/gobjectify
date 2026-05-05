@@ -156,7 +156,7 @@ export class MainWindow extends from(Gtk.ApplicationWindow, {
 }
 ```
 
-Here, GObjectify registers the class with a UI template, binds the internal widgets, creates the GObject properties, binds the `on_count_change` function to the notify signal for `count`, and, instance initialization time, will run `on_count_change` and `_ready()` (which handles our button click connections).
+Here, GObjectify registers the class with a UI template, binds the internal widgets, creates the GObject properties, binds the `on_count_change` function to the notify signal for `count` and also calls it on idle after initialization, and runs `_ready()` during initialization (which handles our button click connections).
 
 Tip: Using UI bound properties can reduce this code even more! (Not demonstrated here, as UI files are out of GObjectify's scope, other than registering templates)
 
