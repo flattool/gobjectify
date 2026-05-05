@@ -747,7 +747,7 @@ function WatchProp<T extends GObject.Object, K extends WatchPropKeys<T>>(prop_na
 		context.addInitializer(function (this: T): void {
 			this.connect(`notify::${kebab}`, target.bind(this))
 			next_idle().then(() => target.call(this)).catch((e) => {
-				print(`Error in @WatchProp method '${target.name}`)
+				print(`Error in @WatchProp method '${target.name}'`)
 				print(e)
 			})
 		})
