@@ -554,18 +554,18 @@ function Debounce<T extends GObject.Object, U extends (this: T, ...args: any[])=
  * @example
  * ```ts
  * class MyWidget extends from(Gtk.Box, {
- *     count_value: Property.double(),
+ *     count_value: Property.double({ flags: "computed" }),
  * }) {
- *     private __count = 0
+ *     #count = 0
  *
  *     override get count_value(): number {
- *         return this.__count
+ *         return this.#count
  *     }
  *
  *     @Notify
  *     override set count_value(val: number) {
  *         print(`Setting count_value to ${val}`)
- *         this.__count = val
+ *         this.#count = val
  *     }
  * }
  *
