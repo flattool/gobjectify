@@ -151,6 +151,10 @@ type Instances<I extends (abstract new (...args: any)=> any)[]> = I extends [inf
  * @remarks
  * The returned class will not function as expected on its own. **Always use `from` with a subclass and with the
  * `GClass` decorator**.
+ * 
+ * The returned class exposes a static `$params` field purely for constructor type information. It has no runtime value.
+ * It is purely useful for when overriding the constructor, to ensure you have all of the parameter type information.
+ * You would use it via: `constructor(params: typeof MyClassName.$params) { super(params) }`
  */
 function from<
 	T extends abstract new (...args: any[])=> GObject.Object,
