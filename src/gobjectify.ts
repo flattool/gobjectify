@@ -673,44 +673,6 @@ function OnSimpleAction<
 }
 
 /**
- * Decorator that runs a method during construction time after GObject finishes its init.
- *
- * When applied to a class method, `OnConstruct` will have the method be ran in the constructor body,
- * after GObject finishes its initialization logic. The method will have full access to construct
- * properties, template children, and class field members.
- * 
- * The method will be ran synchronously, but supports decorating async methods,
- * which will be ran as a standard promise.
- *
- * @param target The original setter method.
- * @param context The decorator context.
- *
- * @example
- * ```ts
- * class MyButton extends Gtk.Button {
- *     @OnConstruct
- *     do_init(): void {
- *         print("a new MyButton has been constructed")
- *     }
- * }
- * ```
- *
- * @remarks
- * when creating a new instance, "a new MyButton has been constructed" is printed during construction
- */
-function OnConstruct<T extends GObject.Object>(target: (this: T)=> void | Promise<void>, context: ClassMethodDecoratorContext<T>): void {
-	context.addInitializer(function (this: T): void {
-		const result = target.call(this)
-		if (result instanceof Promise) {
-			result.catch((e) => {
-				print(`Error in @OnConstruct async method '${target.name}' on ${this.constructor.name}`)
-				print(e)
-			})
-		}
-	})
-}
-
-/**
  * Decorator that connects a method to one or more GObject property change notifications.
  *
  * When applied to a class method, the method will be called asynchronously on idle after class initialization,
