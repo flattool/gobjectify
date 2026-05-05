@@ -716,6 +716,47 @@ function WatchProp<T extends GObject.Object, K extends WatchPropKeys<T>>(prop_na
 	}
 }
 
+const on_post_init_error = (method_name: string, class_name: string, e: unknown): void => {
+	print(`Error in @PostInit function '${method_name}' of '${class_name}':`)
+	print(e)
+}
+
+/**
+ * Decorator for a method that will be called on the next GLib idle iteration after the class has been instantiated.
+ *
+ * The method will be called via GLib.idle_add, which will ensure it waits for an idle cycle after the class
+ * has been constructed. Properties, template children, and class members will all be available when its called.
+ *
+ * @template T The class type containing the property.
+ * @template U The type of value being set.
+ * @param target The original setter method.
+ * @param context The decorator context.
+ *
+ * @example
+ * ```ts
+ * class MyWidget extends Gtk.Box {
+ *     @PostInit
+ *     setup(): void {
+ *         print("MyWidget has been constructed, and an idle cycle has happened!")
+ *     }
+ * }
+ * ```
+ */
+function PostInit<T extends GObject.Object>(target: (this: T)=> any, context: ClassMethodDecoratorContext<T>): void {
+	context.addInitializer(function (this: T) {
+		next_idle().then(() => {
+			try {
+				const result = target.call(this)
+				if (result instanceof Promise) {
+					result.catch((e) => on_post_init_error(target.name, this.constructor.name, e))
+				}
+			} catch (e) {
+				on_post_init_error(target.name, this.constructor.name, e)
+			}
+		})
+	})
+}
+
 /**
  * Schedules a callback to run on the next GLib idle iteration.
  *
@@ -880,6 +921,7 @@ export {
 	WatchProp,
 	OnSignal,
 	OnSimpleAction,
+	PostInit,
 	Property,
 	Child,
 	SimpleAction,
