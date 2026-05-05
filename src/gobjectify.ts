@@ -880,7 +880,6 @@ export {
 	WatchProp,
 	OnSignal,
 	OnSimpleAction,
-	OnConstruct,
 	Property,
 	Child,
 	SimpleAction,
