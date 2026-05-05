@@ -33,7 +33,7 @@ function Child<ChildType extends GObject.Object>(): ChildDescriptor<ChildType> {
 }
 
 function is_child_descriptor(item: any): item is ChildDescriptor<GObject.Object> {
-	return item?.child_symbol == CHILD_SYMBOL
+	return item?.child_symbol === CHILD_SYMBOL
 }
 
 export { type ChildDescriptor, type ExtractChildren, Child, is_child_descriptor }
