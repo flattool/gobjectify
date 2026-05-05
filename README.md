@@ -25,7 +25,7 @@ Writing GObject subclasses in plain GJS, or plain GJS with TS, is very verbose a
 
 GObjectify fixes all of this! With a single declarative descriptor, you define properties, template children, simple actions, and implemented interfaces, all automatically typed and wired into the GObject system.
 
-GObjectify acts as a thin, typesafe layer over GObject, not a framework, so everything remains 100% compatible with GJS, GTK, and GNOME platform APIs.
+GObjectify acts as a thin, type-safe layer over GObject, not a framework, so everything remains 100% compatible with GJS, GTK, and GNOME platform APIs.
 
 Here is an example:
 ```ts
@@ -36,8 +36,9 @@ export class MyWidget extends from(Gtk.Box, {
   title: Property.string({ default: "Hello" }),
   click: SimpleAction(),
 }) {
-  _ready(): void {
-    print(`MyWidget with title '${this.title}' is fully constructed and ready!`)
+  constructor(params: typeof MyWidget.$params) {
+    super(params)
+    print(`MyWidget with title '${this.title}' is fully constructed!`)
   }
 
   @OnSimpleAction("click")
@@ -119,7 +120,7 @@ export class MyWidget extends Base {
     print(`Widget with title '${this.title}' activated!`)
   }
 
-  _ready(): void {
+  constructor() {
     // now the activate function can be triggered with the button or with the action
     this._button.connect("clicked", () => this.#do_activate())
   }
@@ -132,7 +133,6 @@ GObjectify automatically:
 - Installs SimpleActions
 - Connects `@OnSimpleAction` handlers
 - Applies the custom CSS name
-- Runs the `_ready()` when in class initialization, after template children are bound
 
 # An Example: Gtk Application Window with a counter
 
@@ -144,7 +144,8 @@ export class MainWindow extends from(Gtk.ApplicationWindow, {
   _decrement_btn: Child<Gtk.Button>(),
   _count_lbl: Child<Gtk.Label>(),
 }) {
-  _ready(): void {
+  @PostInit
+  setup_connections(): void {
     this._increment_btn.connect("clicked", () => this.count++)
     this._decrement_btn.connect("clicked", () => this.count--)
   }
@@ -156,7 +157,7 @@ export class MainWindow extends from(Gtk.ApplicationWindow, {
 }
 ```
 
-Here, GObjectify registers the class with a UI template, binds the internal widgets, creates the GObject properties, binds the `on_count_change` function to the notify signal for `count` and also calls it on idle after initialization, and runs `_ready()` during initialization (which handles our button click connections).
+Here, GObjectify registers the class with a UI template, binds the internal widgets, creates the GObject properties, binds the `on_count_change` function to the notify signal for `count` and also calls it and `setup_connections` (which handles our button click connections) on idle after initialization.
 
 Tip: Using UI bound properties can reduce this code even more! (Not demonstrated here, as UI files are out of GObjectify's scope, other than registering templates)
 

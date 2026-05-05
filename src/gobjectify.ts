@@ -173,13 +173,6 @@ function from<
 	return Base as any
 }
 
-type ReadyFunc = { _ready?: ()=> (void | Promise<void>) }
-
-const on_ready_error = (class_name: string, e: unknown): void => {
-	print(`Error in _ready function for ${class_name}`)
-	print(e)
-}
-
 const make_numeric_accessors = (
 	spec: GObject.ParamSpec<number>,
 	desc: globalThis.PropertyDescriptor,
@@ -255,7 +248,6 @@ const numeric_kind_from_gtype = new Map<GObject.GType, "int32" | "uint32" | "dou
  * It wraps a standard GObject derived class and automatically handles:
  * - Sets the class name as the GType name (can be overridden with `options.manual_gtype_name`)
  * - Registering signals declared via the `Signal` decorator
- * - Running an optional `_ready` method synchronously during instantiation, after template children are bound
  * - Registering an optional UI template file, custom CSS name, GType Flags, or interface implementations
  * - Registers and inits GObject properties provided by the `from` base and/or from `manual_properties`
  * - Registers internal children provided by the `from` base and/or from `manual_internal_children`
@@ -280,23 +272,19 @@ const numeric_kind_from_gtype = new Map<GObject.GType, "int32" | "uint32" | "dou
  * class MyWidget extends from(Gtk.Box, {
  *     title: Property.string({ default: "My Awesome Widget" }),
  * }) {
- *     _ready() {
- *         print(`${this.title} is ready!`)
+ *     constructor(params: typeof MyWidget.$params) {
+ *         super(params)
+ *         print(`${this.title} is created!`)
  *     }
  * }
  * ```
  *
  * @remarks
- * If a `_ready` function is defined on the class, it may only return `void` or `Promise<void>`.
- * If provided, the `_ready` is called once synchronously during initialization, after template children
- * have been bound. At this point, `CONSTRUCT` and `CONSTRUCT_ONLY` properties are guaranteed to be
- * set, but `READWRITE` properties set by GtkBuilder may not yet be available.
- * 
  * All properties defined with GObjectify's Property are marked as `CONSTRUCT` properties,
- * so they are guaranteed to be set before `_ready` is called.
+ * so they are guaranteed to be set after `super()` is finished in the constructor.
  */
 function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
-	return function (target: GClassFor<T & ReadyFunc>, _context: ClassDecoratorContext): void {
+	return function (target: GClassFor<T>, _context: ClassDecoratorContext): void {
 		const prototype = target.prototype
 		const parent = Object.getPrototypeOf(target)
 		const maybe_metadata: unknown = (parent as any)?.[GOBJECTIFY_FROM_SYMBOL]
@@ -407,16 +395,6 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 
 			// makes "readonly" flagged properties throw when set after this point
 			this[INIT_FINISHED_SYMBOL] = true
-
-			const ready = prototype._ready
-			if (typeof ready === "function") {
-				try {
-					const return_val = prototype._ready.call(this)
-					if (return_val instanceof Promise) return_val.catch(on_ready_error.bind(null, target.name))
-				} catch (e) {
-					on_ready_error(target.name, e)
-				}
-			}
 
 			return original_return_val
 		}

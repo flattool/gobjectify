@@ -269,7 +269,7 @@ const is_property_descriptor = (item: any): item is PropertyDescriptor<any, Para
  * Each function corresponds to a different type of property, and accepts an optional configuration object to set details about the property.
  * See each function for details.
  * 
- * Every property made through this is marked as GObject.ParamFlags.CONSTRUCT, meaning their initial values will be available during construction and _ready.
+ * Every property made through this is marked as GObject.ParamFlags.CONSTRUCT, meaning their initial values will be available during construction.
  */
 const Property = {
 	/**
