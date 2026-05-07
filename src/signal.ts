@@ -67,60 +67,51 @@ type SignalsOf<T extends GObject.Object> = {
 }
 
 type SignalOverrides<T extends GObject.Object, D> = {
-	connect<const Self extends GObject.Object, S extends keyof ExtractSignals<D> | keyof SignalsOf<T> | (string & {})>(
+	$connect<const Self extends GObject.Object, S extends keyof ExtractSignals<D> | keyof SignalsOf<T>>(
 		signal_name: S,
-		callback: S extends keyof SignalsOf<T>	
-			? SignalsOf<T>[S] extends (...args: infer Args) => infer Ret
-				? (self: Self, ...args: Args) => Ret
-				: never
+		callback: SignalsOf<T>[S] extends (...args: infer Args) => infer Ret
+			? (self: Self, ...args: Args) => Ret
 			: S extends keyof ExtractSignals<D>
 				? ExtractSignals<D>[S] extends SignalDescriptor<infer Args, infer Ret>
 					? (self: Self, ...args: UnwrapSignalArgs<Args>) => UnwrapSignalArg<Ret>
 					: never
 				: never
 	): number,
-	connect_after<const Self extends GObject.Object, S extends keyof ExtractSignals<D> | keyof SignalsOf<T> | (string & {})>(
+	$connect_after<const Self extends GObject.Object, S extends keyof ExtractSignals<D> | keyof SignalsOf<T>>(
 		signal_name: S,
-		callback: S extends keyof SignalsOf<T>
-			? SignalsOf<T>[S] extends (...args: infer Args) => infer Ret
-				? (self: Self, ...args: Args) => Ret
-				: never
+		callback: SignalsOf<T>[S] extends (...args: infer Args) => infer Ret
+			? (self: Self, ...args: Args) => Ret
 			: S extends keyof ExtractSignals<D>
 				? ExtractSignals<D>[S] extends SignalDescriptor<infer Args, infer Ret>
 					? (self: Self, ...args: UnwrapSignalArgs<Args>) => UnwrapSignalArg<Ret>
 					: never
 				: never
 	): number,
-	emit<const S extends keyof ExtractSignals<D> | keyof SignalsOf<T> | (string & {})>(
+	$emit<S extends keyof ExtractSignals<D> | keyof SignalsOf<T>>(
 		signal_name: S,
-		...args: S extends keyof SignalsOf<T>
-			? SignalsOf<T>[S] extends (...args: infer Args) => any
-				? Args
-				: never
+		...args: SignalsOf<T>[S] extends (...args: infer Args) => any
+			? Args
 			: S extends keyof ExtractSignals<D>
 				? ExtractSignals<D>[S] extends SignalDescriptor<infer Args, any>
 					? UnwrapSignalArgs<Args>
 					: never
 				: never
 	): void,
-	// Additions
+	$connect_async<S extends keyof ExtractSignals<D> | keyof SignalsOf<T>>(
+		resolve_signal: S,
+		reject_signal?: keyof ExtractSignals<D> | keyof SignalsOf<T>,
+	): SignalsOf<T>[S] extends (...args: infer Args) => void
+		? Promise<Args>
+		: S extends keyof ExtractSignals<D>
+			? ExtractSignals<D>[S] extends SignalDescriptor<infer Args, void>
+				? Promise<UnwrapSignalArg<Args>>
+				: never
+			: never
 	$signals: {
 		[Key in keyof ExtractSignals<D>]: ExtractSignals<D>[Key] extends SignalDescriptor<infer Args, infer Ret>
 			? (...args: UnwrapSignalArgs<Args>) => (Ret extends void ? void : UnwrapSignalArg<Ret>)
 			: never
 	},
-	$signal<const Self extends GObject.Object, S extends keyof ExtractSignals<D> | keyof SignalsOf<T>>(
-		this: Self,
-		signal_name: S,
-	): S extends keyof ExtractSignals<D>
-		? ExtractSignals<D>[S] extends SignalDescriptor<infer Args, infer Ret>
-			? {
-				connect(callback: (self: Self, ...args: UnwrapSignalArgs<Args>) => UnwrapSignalArg<Ret>): number,
-			} : never
-		: SignalsOf<T>[S] extends (...args: infer Args) => infer Ret
-			? {
-				connect(callback: (self: Self, ...args: Args) => Ret): number
-			} : never
 }
 
 const signal_descriptor_args_to_gtypes = (item: SignalArgument): GObject.GType => {

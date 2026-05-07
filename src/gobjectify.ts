@@ -26,6 +26,7 @@ import {
 	Signal,
 	connect_async,
 	is_signal_descriptor,
+	type SignalsOf,
 } from "./signal.js"
 import {
 	type ActionDescriptor,
@@ -77,7 +78,6 @@ type ResultingClass<
 	I extends AbstractGClassFor<GObject.Object>[],
 > = { $gtype: GObject.GType, $params: ResultingConstructorParamsObj<T, D>[0] } & (
 	abstract new (...args: ResultingConstructorParamsObj<T, D>)=> (
-		// Omit<InstanceType<T>, "connect" | "connect_after" | "emit">
 		SignalOverrides<InstanceType<T>, D>
 		& InstanceType<T>
 		& ExtractWriteableProps<D>
@@ -87,12 +87,6 @@ type ResultingClass<
 		& Finalize<{ with_implements: I extends [] ? never : Instances<I> }>
 	)
 )
-
-type RemoveMethods<T extends GObject.Object, D> = {
-	[K in keyof T]: K extends "connect" | "connect_after" | "emit"
-		? SignalOverrides<T, D>[K]
-		: T[K]
-}
 
 type ClassDecoratorParams = {
 	template?: Uint8Array | GLib.Bytes | string,
@@ -567,8 +561,6 @@ function Notify<T extends GObject.Object, U>(
 }
 
 /**
- * TODO: Make the signal_name type safe
- * 
  * Decorator that connects a method to a GObject signal emission.
  *
  * When applied to a class method, `OnSignal(signal_name)` ensures that the method
@@ -595,15 +587,18 @@ function Notify<T extends GObject.Object, U>(
  * @remarks
  * handle_click is automatically called when "clicked" is emitted
  */
-function OnSignal(signal_name: string) {
-	return <T extends GObject.Object>(
-		target: (this: T, ...args: any[])=> void,
+function OnSignal<T extends GObject.Object, S extends keyof SignalsOf<T>>(
+	signal_name: S,
+) {
+	return (
+		target: (
+			this: T,
+			...args: SignalsOf<T>[S] extends (...args: infer Args) => any ? Args : never
+		) => SignalsOf<T>[S] extends (...args: any) => infer Ret ? Ret : never,
 		context: ClassMethodDecoratorContext<T>,
-	): void => {
-		context.addInitializer(function (this: T): void {
-			this.connect(signal_name, target.bind(this))
-		})
-	}
+	): void => context.addInitializer(function (this: T): void {
+		this.connect(signal_name as string, target.bind(this))
+	})
 }
 
 /**
@@ -816,17 +811,36 @@ function dedent(strings: TemplateStringsArray, ...values: any[]): string {
 declare module "gi://GObject?version=2.0" {
 	export namespace GObject {
 		export interface Object {
-			$signal<
-				const Self extends GObject.Object,
-				const S extends keyof Self["$signals"]
-			>(
+			$connect<const Self extends GObject.Object, S extends keyof Self["$signals"]>(
 				this: Self,
-				signal: S,
-			): Self["$signals"][S] extends (...args: infer Args) => infer Ret
-				? {
-					connect(callback: (...args: Args) => Ret): number
-				} : never
-				
+				signal_name: S,
+				callback: Self["$signals"][S] extends (...args: infer Args) => infer Ret
+					? (self: Self, ...args: Args) => Ret
+					: never
+				,
+			): number,
+			$connect_after<const Self extends GObject.Object, S extends keyof Self["$signals"]>(
+				this: Self,
+				signal_name: S,
+				callback: Self["$signals"][S] extends (...args: infer Args) => infer Ret
+					? (self: Self, ...args: Args) => Ret
+					: never
+				,
+			): number,
+			$emit<const Self extends GObject.Object, S extends keyof Self["$signals"]>(
+				this: Self,
+				signal_name: S,
+				...args: Self["$signals"][S] extends (...args: infer Args) => any
+					? Args
+					: never
+			): void
+			$connect_async<const Self extends GObject.Object, S extends keyof Self["$signals"]>(
+				this: Self,
+				resolve_signal: S,
+				reject_signal?: keyof Self["$signals"]
+			): Self["$signals"][S] extends (...args: infer Args) => void
+				? Promise<Args>
+				: never
 		}
 	}
 }
