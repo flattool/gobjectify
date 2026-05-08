@@ -161,7 +161,39 @@ const signal_descriptor_args_to_gtypes = (item: SignalArgument): GObject.GType =
 	throw new Error(`Attempted to register a GObjectify signal with a non-GObject.GType: '${item}'`)
 }
 
-// TODO: ADD DOCS
+/**
+ * Creates a Signal descriptor for use with `from` and `GClass`.
+ * 
+ * `from` and `GClass` will register the signals on the subclass, allowing them to be connected and emitted.
+ * 
+ * Note: any signals with underscores ('_') in their names will be remapped to hyphens ('-'). Example: `"user_added"` -> `"user-added"`.
+ * Use these remapped names when connecting and emitting the signals.
+ * 
+ * Tip: GObjectify's provided `$connect`, `$connect_after`, `$connect_async`, and `$emit` methods are type-aware,
+ * and will give auto-complete suggestions for these signals, as well as ensure arguments and returned values match the declared types.
+ * 
+ * @param parameters The types of values that must be emitted, and that will be passed to connected functions.
+ * Allows for the following:
+ * - `Number` (maps to GObject.TYPE_DOUBLE)
+ * - `String` (maps to GObject.TYPE_STRING)
+ * - `Boolean` (maps to GObject.TYPE_BOOLEAN)
+ * - Any GObject.TYPE_*
+ * - Any GObject subclass
+ * - Any GObject enum
+ * @param options Advanced signal configuration options. Refer to GObject Signal documentation for more information
+ * 
+ * @example
+ * ```ts
+ * @GClass()
+ * export class Example extends from(Gtk.Button, {
+ *     user_added: Signal([String]),
+ * }) {
+ *     do_example(): void {
+ *         this.$emit("user-added", "John Doe")
+ *     }
+ * }
+ * ```
+ */
 const Signal = <const A extends [] | SignalArgument[] = [], const R extends SignalArgument | void = void>(
 	parameters?: A,
 	options?: {
