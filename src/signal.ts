@@ -11,10 +11,10 @@ type SignalArgument = (
 )
 
 type RegisterableSignal = {
-	flags?: GObject.SignalFlags,
-	param_types?: GObject.GType[],
-	return_type?: GObject.GType,
-	accumulator?: GObject.AccumulatorType,
+	flags: GObject.SignalFlags | undefined,
+	param_types: GObject.GType[],
+	return_type: GObject.GType | undefined,
+	accumulator: GObject.AccumulatorType | undefined,
 }
 
 type SignalDescriptor<A extends SignalArgument[], R extends SignalArgument | void> = {
@@ -97,6 +97,45 @@ type SignalOverrides<T extends GObject.Object, D> = {
 					: never
 				: never
 	): void,
+	/**
+	 * Connects to a GObject signal and returns a Promise that resolves the first time the signal is emitted.
+	 *
+	 * This function is an async wrapper for GObject signals, allowing you
+	 * to `await` the emission of a signal instead of using callbacks.
+	 * Optionally, you can provide a `reject_signal` that will reject the promise if that signal is emitted first.
+	 *
+	 * The connected signal handlers are automatically disconnected once the promise
+	 * resolves or rejects, preventing memory leaks or duplicate connections.
+	 *
+	 * @param resolve_signal The signal name whose emission will resolve the promise.
+	 * @param reject_signal Optional signal name whose emission will reject the promise.
+	 * @returns A promise that resolves with the arguments emitted by `resolve_signal`.
+	 * 
+	 * @remarks
+	 * Only signals with a `void` return type can be awaited. Signals that return
+	 * a value cannot be used with `$connect_async`, as the return value is
+	 * provided by the handler rather than the emission. Use `$connect` directly
+	 * for non-void signals.
+	 *
+	 * @example
+	 * ```ts
+	 * // Wait for a Gtk.Button to be clicked once
+	 * const button = new Gtk.Button({ label: "Click me" })
+	 * await button.$connect_async("clicked")
+	 * print("Button clicked!")
+	 * ```
+	 *
+	 * @example
+	 * ```ts
+	 * // Handle a signal that could fail
+	 * try {
+	 *     const [result] = await obj.$connect_async("success-signal", "error-signal")
+	 *     print(`Success: ${result}`)
+	 * } catch (err) {
+	 *     print(`Error signal triggered: ${err.message}`)
+	 * }
+	 * ```
+	 */
 	$connect_async<S extends keyof ExtractSignals<D> | keyof SignalsOf<T>>(
 		resolve_signal: S,
 		reject_signal?: keyof ExtractSignals<D> | keyof SignalsOf<T>,
@@ -104,7 +143,7 @@ type SignalOverrides<T extends GObject.Object, D> = {
 		? Promise<Args>
 		: S extends keyof ExtractSignals<D>
 			? ExtractSignals<D>[S] extends SignalDescriptor<infer Args, void>
-				? Promise<UnwrapSignalArg<Args>>
+				? Promise<UnwrapSignalArgs<Args>>
 				: never
 			: never
 	$signals: {
@@ -123,16 +162,13 @@ const signal_descriptor_args_to_gtypes = (item: SignalArgument): GObject.GType =
 }
 
 // TODO: ADD DOCS
-const Signal = <
-    const A extends [] | SignalArgument[] = [],
-    const R extends SignalArgument | void = void,
->(
-    parameters?: A,
-    options?: {
-        return_type?: R,
-        flags?: GObject.SignalFlags,
-        accumulator?: GObject.AccumulatorType,
-    }
+const Signal = <const A extends [] | SignalArgument[] = [], const R extends SignalArgument | void = void>(
+	parameters?: A,
+	options?: {
+		return_type?: R,
+		flags?: GObject.SignalFlags,
+		accumulator?: GObject.AccumulatorType,
+	}
 ): ([] extends A
 	? void extends R
 		? SignalDescriptor<[], void>
@@ -145,74 +181,16 @@ const Signal = <
 	...options,
 	signal_symbol: SIGNAL_SYMBOL,
 	create: () => ({
-		...(parameters && { parameters: parameters.map(signal_descriptor_args_to_gtypes )}),
-		...(options?.accumulator && { accumulator: options.accumulator }),
-		...(options?.flags && { flags: options.flags }),
-		...(options?.return_type && { return_type: signal_descriptor_args_to_gtypes(options.return_type) }),
-	} satisfies RegisterableSignal),
+		param_types: parameters?.map(signal_descriptor_args_to_gtypes) ?? [],
+		accumulator: options?.accumulator,
+		flags: options?.flags,
+		return_type: options?.return_type && signal_descriptor_args_to_gtypes(options.return_type),
+	}),
 } satisfies SignalDescriptor<any, any> as any)
 
 function is_signal_descriptor(item: any): item is SignalDescriptor<SignalArgument[], SignalArgument | void> {
 	return item?.signal_symbol === SIGNAL_SYMBOL
 }
-
-/**
- * Connects to a GObject signal and returns a Promise that resolves the first time the signal is emitted.
- *
- * This function is an async wrapper for GObject signals, allowing you
- * to `await` the emission of a signal instead of using callbacks.
- * Optionally, you can provide a `reject_signal` that will reject the promise if that signal is emitted first.
- *
- * The connected signal handlers are automatically disconnected once the promise
- * resolves or rejects, preventing memory leaks or duplicate connections.
- *
- * @param obj The GObject instance to connect to.
- * @param resolve_signal The signal name whose emission will resolve the promise.
- * @param reject_signal Optional signal name whose emission will reject the promise.
- * @returns A promise that resolves with the arguments emitted by `resolve_signal`.
- *
- * @example
- * ```ts
- * // Wait for a Gtk.Button to be clicked once
- * const button = new Gtk.Button({ label: "Click me" })
- * await connect_async(button, "clicked")
- * print("Button clicked!")
- * ```
- *
- * @example
- * ```ts
- * // Handle a signal that could fail
- * try {
- *     const [result] = await connect_async(obj, "success-signal", "error-signal");
- *     print(`Success: ${result}`);
- * } catch (err) {
- *     print(`Error signal triggered: ${err.message}`);
- * }
- * ```
- */
-const connect_async = <T extends GObject.Object, S extends keyof SignalsOf<T>>(
-	obj: T,
-	resolve_signal: S,
-	reject_signal?: keyof SignalsOf<T>,
-): Promise<SignalsOf<T>[S] extends ((...args: infer Args) => any) ? Args : never> => new Promise((resolve, reject) => {
-	let resolve_id: number | null = null
-	let reject_id: number | null = null
-	const cleanup = (): void => {
-		if (resolve_id !== null) obj.disconnect(resolve_id)
-		if (reject_id !== null) obj.disconnect(reject_id)
-	}
-
-	resolve_id = obj.connect(resolve_signal as string, (_obj, ...args) => {
-		cleanup()
-		resolve(args as any)
-	})
-
-	if (!reject_signal) return
-	reject_id = obj.connect(reject_signal as string, (_obj, ...args: any) => {
-		cleanup()
-		reject(new Error(`Rejection signal: '${String(reject_signal)}' triggered with args: ${args}`))
-	})
-})
 
 export {
 	type SignalDescriptor,
@@ -223,5 +201,4 @@ export {
 	type RegisterableSignal,
 	Signal,
 	is_signal_descriptor,
-	connect_async,
 }

@@ -22,9 +22,7 @@ import {
 	type SignalArgument,
 	type SignalOverrides,
 	type RegisterableSignal,
-	type ExtractSignals,
 	Signal,
-	connect_async,
 	is_signal_descriptor,
 	type SignalsOf,
 } from "./signal.js"
@@ -816,40 +814,99 @@ declare module "gi://GObject?version=2.0" {
 				signal_name: S,
 				callback: Self["$signals"][S] extends (...args: infer Args) => infer Ret
 					? (self: Self, ...args: Args) => Ret
-					: never
-				,
+					: never,
 			): number,
 			$connect_after<const Self extends GObject.Object, S extends keyof Self["$signals"]>(
 				this: Self,
 				signal_name: S,
 				callback: Self["$signals"][S] extends (...args: infer Args) => infer Ret
 					? (self: Self, ...args: Args) => Ret
-					: never
-				,
+					: never,
 			): number,
 			$emit<const Self extends GObject.Object, S extends keyof Self["$signals"]>(
 				this: Self,
 				signal_name: S,
 				...args: Self["$signals"][S] extends (...args: infer Args) => any
 					? Args
-					: never
-			): void
+					: never,
+			): void,
+			/**
+			 * Connects to a GObject signal and returns a Promise that resolves the first time the signal is emitted.
+			 *
+			 * This function is an async wrapper for GObject signals, allowing you
+			 * to `await` the emission of a signal instead of using callbacks.
+			 * Optionally, you can provide a `reject_signal` that will reject the promise if that signal is emitted first.
+			 *
+			 * The connected signal handlers are automatically disconnected once the promise
+			 * resolves or rejects, preventing memory leaks or duplicate connections.
+			 *
+			 * @param resolve_signal The signal name whose emission will resolve the promise.
+			 * @param reject_signal Optional signal name whose emission will reject the promise.
+			 * @returns A promise that resolves with the arguments emitted by `resolve_signal`.
+			 * 
+			 * @remarks
+			 * Only signals with a `void` return type can be awaited. Signals that return
+			 * a value cannot be used with `$connect_async`, as the return value is
+			 * provided by the handler rather than the emission. Use `$connect` directly
+			 * for non-void signals.
+			 *
+			 * @example
+			 * ```ts
+			 * // Wait for a Gtk.Button to be clicked once
+			 * const button = new Gtk.Button({ label: "Click me" })
+			 * await button.$connect_async("clicked")
+			 * print("Button clicked!")
+			 * ```
+			 *
+			 * @example
+			 * ```ts
+			 * // Handle a signal that could fail
+			 * try {
+			 *     const [result] = await obj.$connect_async("success-signal", "error-signal")
+			 *     print(`Success: ${result}`)
+			 * } catch (err) {
+			 *     print(`Error signal triggered: ${err.message}`)
+			 * }
+			 * ```
+			 */
 			$connect_async<const Self extends GObject.Object, S extends keyof Self["$signals"]>(
 				this: Self,
 				resolve_signal: S,
 				reject_signal?: keyof Self["$signals"]
 			): Self["$signals"][S] extends (...args: infer Args) => void
 				? Promise<Args>
-				: never
+				: never,
 		}
 	}
 }
+
+GObject.Object.prototype.$connect = GObject.Object.prototype.connect
+GObject.Object.prototype.$connect_after = GObject.Object.prototype.connect_after
+GObject.Object.prototype.$emit = GObject.Object.prototype.emit
+GObject.Object.prototype.$connect_async = function (this: GObject.Object, resolve_signal: string, reject_signal?: string): Promise<any> {
+	return new Promise((resolve, reject) => {
+		let resolve_id: number | undefined
+		let reject_id: number | undefined
+		const cleanup = (): void => {
+			if (resolve_id !== undefined) this.disconnect(resolve_id)
+			if (reject_id !== undefined) this.disconnect(reject_id)
+		}
+		resolve_id = this.connect(resolve_signal, (_ob, ...args) => {
+			cleanup()
+			resolve(args)
+		})
+		if (!reject_signal) return
+		reject_id = this.connect(reject_signal, (_obj, ...args) => {
+			cleanup()
+			reject(new Error(`Rejection signal: '${String(reject_signal)}' triggered with args: ${args}`))
+		})
+	})
+} as any
 
 export {
 	from,
 	next_idle,
 	timeout_ms,
-	connect_async,
 	dedent,
 	ConstMap,
 	GClass,
