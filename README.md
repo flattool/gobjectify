@@ -132,7 +132,6 @@ GObjectify automatically:
 - Binds template children
 - Installs SimpleActions
 - Connects `@OnSimpleAction` handlers
-- Applies the custom CSS name
 
 # An Example: Gtk Application Window with a counter
 

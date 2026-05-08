@@ -143,7 +143,7 @@ type Instances<I extends (abstract new (...args: any)=> any)[]> = I extends [inf
  * descriptor object passed in. Children, properties, and actions defined in here will be picked up by the `GClass`
  * decorator **for use in a subclass**.
  *
- * See Child, Property, and Action for info on defining members for the descriptor and your resulting subclass.
+ * See Child, Property, Signal, and Action for info on defining members for the descriptor and your resulting subclass.
  *
  * This function does **not** make a usable class on its own! Do **not** create instances from the returned class.
  *
