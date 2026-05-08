@@ -61,13 +61,19 @@ type Descriptor<D, T extends GObject.Object> = {
 type GClassFor<T extends GObject.Object> = new (...args: any[])=> T
 type AbstractGClassFor<T extends GObject.Object> = abstract new (...args: any[])=> T
 
+type ValidConstructorProps<D> = {
+	[K in keyof (ExtractConstructProps<D> & ExtractWriteableProps<D>)]?: (ExtractConstructProps<D> & ExtractWriteableProps<D>)[K]
+}
+
 type ResultingConstructorParamsObj<
 	T extends AbstractGClassFor<GObject.Object>,
 	D extends Descriptor<D, InstanceType<T>>
 > = ConstructorParameters<T> extends []
-	? [Partial<ExtractConstructProps<D> & ExtractWriteableProps<D>>]
+	? [ValidConstructorProps<D>]
 	: ConstructorParameters<T> extends [(infer First)?, ...infer Rest]
-		? [Partial<ExtractConstructProps<D> & ExtractWriteableProps<D>> & First, ...Rest]
+		? undefined extends ConstructorParameters<T>[0]
+			? [(ValidConstructorProps<D> & First)?, ...Rest]
+			: [(ValidConstructorProps<D> & First), ...Rest]
 		: never
 
 type ResultingClass<
