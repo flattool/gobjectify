@@ -18,6 +18,15 @@ import {
 	num_sizes_and_spec,
 } from "./property.js"
 import {
+	type SignalDescriptor,
+	type SignalArgument,
+	type SignalOverrides,
+	type RegisterableSignal,
+	Signal,
+	is_signal_descriptor,
+	type SignalsOf,
+} from "./signal.js"
+import {
 	type ActionDescriptor,
 	type ExtractActions,
 	SimpleAction,
@@ -40,7 +49,9 @@ type Descriptor<D, T extends GObject.Object> = {
 		? never
 		: (Key extends `_${string}`
 			? ChildDescriptor<GObject.Object>
-			: PropertyDescriptor<any, any>
+			: Key extends keyof T["$signals"]
+				? PropertyDescriptor<any, any>
+				: PropertyDescriptor<any, any> | SignalDescriptor<SignalArgument[], SignalArgument | void>
 		) | (T extends Gtk.Application | Gtk.ApplicationWindow | Gtk.Widget
 			? ActionDescriptor
 			: never
@@ -65,7 +76,8 @@ type ResultingClass<
 	I extends AbstractGClassFor<GObject.Object>[],
 > = { $gtype: GObject.GType, $params: ResultingConstructorParamsObj<T, D>[0] } & (
 	abstract new (...args: ResultingConstructorParamsObj<T, D>)=> (
-		InstanceType<T>
+		SignalOverrides<InstanceType<T>, D>
+		& InstanceType<T>
 		& ExtractWriteableProps<D>
 		& ExtractReadonlyProps<D>
 		& Finalize<ExtractChildren<D>>
@@ -73,13 +85,6 @@ type ResultingClass<
 		& Finalize<{ with_implements: I extends [] ? never : Instances<I> }>
 	)
 )
-
-type Signal = {
-	flags?: GObject.SignalFlags,
-	param_types?: GObject.GType[],
-	return_type?: GObject.GType,
-	accumulator?: GObject.AccumulatorType,
-}
 
 type ClassDecoratorParams = {
 	template?: Uint8Array | GLib.Bytes | string,
@@ -105,7 +110,6 @@ type WatchPropKeys<T extends GObject.Object> = {
 const GOBJECTIFY_FROM_SYMBOL = Symbol("GOBJECTIFY_FROM_SYMBOL")
 const ACTION_GROUP_SYMBOL = Symbol("GObjectify_Action_Group_Symbol")
 const INIT_FINISHED_SYMBOL = Symbol("GObjectify_GClass_Initialization_Finished_Symbol")
-const signals_map = new WeakMap<Function, Record<string, Signal>>()
 
 type BaseMetadata<D, T extends AbstractGClassFor<GObject.Object>> = {
 	extend: T,
@@ -296,6 +300,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 		const property_descriptors: Record<string, PropertyDescriptor<any, any>> = {}
 		const children: string[] = []
 		const actions = new Map<string, ActionDescriptor>()
+		const signals: Record<string, RegisterableSignal> = {}
 		let implement: (AbstractGClassFor<GObject.Object> & { $gtype: GObject.GType })[] = []
 
 		if (is_base_metadata(maybe_metadata)) {
@@ -352,6 +357,8 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 					children.push(name.replace("_", ""))
 				} else if (is_action_descriptor(value)) {
 					actions.set(name, value)
+				} else if (is_signal_descriptor(value)) {
+					signals[name.replaceAll("_", "-")] = value.create()
 				}
 			}
 
@@ -409,12 +416,11 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 			Implements: implement,
 			Properties: properties,
 			InternalChildren: options?.manual_internal_children?.concat(children) ?? children,
-			Signals: signals_map.get(target) ?? {},
+			Signals: signals,
 			...(options?.css_name && { CssName: options.css_name }),
 			...(options?.gtype_flags && { GTypeFlags: options.gtype_flags }),
 			...(options?.template && { Template: options.template }),
 		}, target)
-		signals_map.delete(target)
 
 		for (const [key, spec] of Object.entries(properties)) {
 			if (
@@ -440,39 +446,6 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				...accessors,
 			})
 		}
-	}
-}
-
-/**
- * Class decorator that declares a GObject signal for a GClass decorated class.
- *
- * Use this decorator to declare one or more signals on a GObject class before decorating it with `GClass`.
- * The signals are registered when the class is processed by `GClass`.
- *
- * @param name The name of the signal to declare.
- * @param props Optional metadata for the signal, including flags, parameter types, return type, and accumulator.
- *
- * @example
- * ```ts
- * @GClass()
- * @Signal("clicked")
- * @Signal("toggled", { flags: GObject.SignalFlags.RUN_FIRST })
- * class BoxButton extends Gtk.Box {}
- * // Instances from BoxButton now have "clicked" and "toggled" as available signals to connect to and/or emit
- * ```
- *
- * @remarks
- * The decorator does not modify class methods. It only adds signal metadata.
- * Signals are only registered once the class is wrapped with `GClass`.
- */
-function Signal<T extends GObject.Object>(name: string, props?: Signal) {
-	return (target: GClassFor<T>, _context: ClassDecoratorContext): void => {
-		let signals = signals_map.get(target)
-		if (!signals) {
-			signals = {}
-			signals_map.set(target, signals)
-		}
-		signals[name] = props ?? {}
 	}
 }
 
@@ -612,15 +585,18 @@ function Notify<T extends GObject.Object, U>(
  * @remarks
  * handle_click is automatically called when "clicked" is emitted
  */
-function OnSignal(signal_name: string) {
-	return <T extends GObject.Object>(
-		target: (this: T, ...args: any[])=> void,
+function OnSignal<T extends GObject.Object, S extends keyof SignalsOf<T>>(
+	signal_name: S,
+) {
+	return (
+		target: (
+			this: T,
+			...args: SignalsOf<T>[S] extends (...args: infer Args) => any ? Args : never
+		) => SignalsOf<T>[S] extends (...args: any) => infer Ret ? Ret : never,
 		context: ClassMethodDecoratorContext<T>,
-	): void => {
-		context.addInitializer(function (this: T): void {
-			this.connect(signal_name, target.bind(this))
-		})
-	}
+	): void => context.addInitializer(function (this: T): void {
+		this.connect(signal_name as string, target.bind(this))
+	})
 }
 
 /**
@@ -785,65 +761,6 @@ async function timeout_ms(duration: number): Promise<void> {
 }
 
 /**
- * Connects to a GObject signal and returns a Promise that resolves the first time the signal is emitted.
- *
- * This function is an async wrapper for GObject signals, allowing you
- * to `await` the emission of a signal instead of using callbacks.
- * Optionally, you can provide a `reject_signal` that will reject the promise if that signal is emitted first.
- *
- * The connected signal handlers are automatically disconnected once the promise
- * resolves or rejects, preventing memory leaks or duplicate connections.
- *
- * @template Args Specify an array of types that the resolve_signal should emit instances of
- * @param obj The GObject instance to connect to.
- * @param resolve_signal The signal name whose emission will resolve the promise.
- * @param reject_signal Optional signal name whose emission will reject the promise.
- * @returns A promise that resolves with the arguments emitted by `resolve_signal`.
- *
- * @example
- * // Wait for a Gtk.Button to be clicked once
- * const button = new Gtk.Button({ label: "Click me" })
- * await connect_async(button, "clicked")
- * print("Button clicked!")
- *
- * @example
- * ```ts
- * // Handle a signal that could fail
- * try {
- *     const [result] = await connect_async<[string]>(obj, "success-signal", "error-signal");
- *     print(`Success: ${result}`);
- * } catch (err) {
- *     print(`Error signal triggered: ${err.message}`);
- * }
- * ```
- */
-async function connect_async<Args extends unknown[] = []>(
-	obj: GObject.Object,
-	resolve_signal: string,
-	reject_signal?: string,
-): Promise<Args> {
-	return new Promise((resolve, reject) => {
-		let resolve_id: number | null = null
-		let reject_id: number | null = null
-		const cleanup = (): void => {
-			if (resolve_id !== null) obj.disconnect(resolve_id)
-			if (reject_id !== null) obj.disconnect(reject_id)
-		}
-
-		resolve_id = obj.connect(resolve_signal, (_obj, ...args: Args) => {
-			cleanup()
-			resolve(args)
-		})
-
-		if (!reject_signal) return
-		reject_id = obj.connect(reject_signal, (_obj, ...args: any) => {
-			cleanup()
-			reject(new Error(`Rejection signal: '${reject_signal}' triggered with args: ${args}`))
-		})
-	})
-}
-
-/**
  * Removes common leading indentation from a template string. Allowing for multi-line strings that don't have improper
  * indentation from source code.
  *
@@ -889,11 +806,107 @@ function dedent(strings: TemplateStringsArray, ...values: any[]): string {
 	return lines.map((line) => (line.trim() === "" ? line : line.slice(mindent))).join("\n")
 }
 
+declare module "gi://GObject?version=2.0" {
+	export namespace GObject {
+		export interface Object {
+			$connect<const Self extends GObject.Object, S extends keyof Self["$signals"]>(
+				this: Self,
+				signal_name: S,
+				callback: Self["$signals"][S] extends (...args: infer Args) => infer Ret
+					? (self: Self, ...args: Args) => Ret
+					: never,
+			): number,
+			$connect_after<const Self extends GObject.Object, S extends keyof Self["$signals"]>(
+				this: Self,
+				signal_name: S,
+				callback: Self["$signals"][S] extends (...args: infer Args) => infer Ret
+					? (self: Self, ...args: Args) => Ret
+					: never,
+			): number,
+			$emit<const Self extends GObject.Object, S extends keyof Self["$signals"]>(
+				this: Self,
+				signal_name: S,
+				...args: Self["$signals"][S] extends (...args: infer Args) => any
+					? Args
+					: never,
+			): void,
+			/**
+			 * Connects to a GObject signal and returns a Promise that resolves the first time the signal is emitted.
+			 *
+			 * This function is an async wrapper for GObject signals, allowing you
+			 * to `await` the emission of a signal instead of using callbacks.
+			 * Optionally, you can provide a `reject_signal` that will reject the promise if that signal is emitted first.
+			 *
+			 * The connected signal handlers are automatically disconnected once the promise
+			 * resolves or rejects, preventing memory leaks or duplicate connections.
+			 *
+			 * @param resolve_signal The signal name whose emission will resolve the promise.
+			 * @param reject_signal Optional signal name whose emission will reject the promise.
+			 * @returns A promise that resolves with the arguments emitted by `resolve_signal`.
+			 * 
+			 * @remarks
+			 * Only signals with a `void` return type can be awaited. Signals that return
+			 * a value cannot be used with `$connect_async`, as the return value is
+			 * provided by the handler rather than the emission. Use `$connect` directly
+			 * for non-void signals.
+			 *
+			 * @example
+			 * ```ts
+			 * // Wait for a Gtk.Button to be clicked once
+			 * const button = new Gtk.Button({ label: "Click me" })
+			 * await button.$connect_async("clicked")
+			 * print("Button clicked!")
+			 * ```
+			 *
+			 * @example
+			 * ```ts
+			 * // Handle a signal that could fail
+			 * try {
+			 *     const [result] = await obj.$connect_async("success-signal", "error-signal")
+			 *     print(`Success: ${result}`)
+			 * } catch (err) {
+			 *     print(`Error signal triggered: ${err.message}`)
+			 * }
+			 * ```
+			 */
+			$connect_async<const Self extends GObject.Object, S extends keyof Self["$signals"]>(
+				this: Self,
+				resolve_signal: S,
+				reject_signal?: keyof Self["$signals"]
+			): Self["$signals"][S] extends (...args: infer Args) => void
+				? Promise<Args>
+				: never,
+		}
+	}
+}
+
+GObject.Object.prototype.$connect = GObject.Object.prototype.connect
+GObject.Object.prototype.$connect_after = GObject.Object.prototype.connect_after
+GObject.Object.prototype.$emit = GObject.Object.prototype.emit
+GObject.Object.prototype.$connect_async = function (this: GObject.Object, resolve_signal: string, reject_signal?: string): Promise<any> {
+	return new Promise((resolve, reject) => {
+		let resolve_id: number | undefined
+		let reject_id: number | undefined
+		const cleanup = (): void => {
+			if (resolve_id !== undefined) this.disconnect(resolve_id)
+			if (reject_id !== undefined) this.disconnect(reject_id)
+		}
+		resolve_id = this.connect(resolve_signal, (_ob, ...args) => {
+			cleanup()
+			resolve(args)
+		})
+		if (!reject_signal) return
+		reject_id = this.connect(reject_signal, (_obj, ...args) => {
+			cleanup()
+			reject(new Error(`Rejection signal: '${String(reject_signal)}' triggered with args: ${args}`))
+		})
+	})
+} as any
+
 export {
 	from,
 	next_idle,
 	timeout_ms,
-	connect_async,
 	dedent,
 	ConstMap,
 	GClass,

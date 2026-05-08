@@ -30,11 +30,11 @@ GObjectify acts as a thin, type-safe layer over GObject, not a framework, so eve
 Here is an example:
 ```ts
 @GClass()
-@Signal("some-signal")
 export class MyWidget extends from(Gtk.Box, {
   _button: Child<Gtk.Button>(),
   title: Property.string({ default: "Hello" }),
   click: SimpleAction(),
+  some_signal: Signal(),
 }) {
   constructor(params: typeof MyWidget.$params) {
     super(params)
@@ -44,7 +44,7 @@ export class MyWidget extends from(Gtk.Box, {
   @OnSimpleAction("click")
   on_click(): void {
     print(`Clicked: ${this.title}`)
-    this.emit("some-signal")
+    this.$emit("some-signal")
   }
 
   @WatchProp("title")
@@ -168,7 +168,7 @@ GObjectify also includes a number of small but powerful, advanced tools to make 
 - **Debounced methods**: `@Debounce(ms)` to limit how often a method runs, perfect for rapid events
 - **Self signal connections** `@OnSignal("signal-name")` on methods to run that method when a signal on the instance is emitted
 - **Automatic notifications**: `@Notify` on setters triggers GObject property notifications automatically
-- **Async signal handling**: `connect_async` to `await` signals like promises, avoiding messy callbacks
+- **Async signal handling**: `obj.$connect_async` to `await` signals like promises, avoiding messy callbacks
 
 # Building from Source
 

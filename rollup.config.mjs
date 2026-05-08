@@ -33,36 +33,36 @@ const output_dir = "dist"
 const tsconfig = "./tsconfig.json"
 
 export default [
-    { // JS Bundle
-        input,
-        output: {
-            file: `${output_dir}/gobjectify.js`,
-            format: "esm",
-            banner,
-        },
-        plugins: [
-            typescript({
-                tsconfig,
-                compilerOptions: {
-                    removeComments: true,
-                },
-            }),
-        ],
-    },
-    { // TS Bundle
-        input,
-        output: {
-            file: `${output_dir}/gobjectify.d.ts`,
-            format: "esm",
-            banner: banner + "\n// @ts-nocheck - Skip checking, to ensure this library wont cause issues for users with different TypeScript setups.",
-        },
-        plugins: [
-            dts({
-                tsconfig,
-                compilerOptions: {
-                    removeComments: false,
-                },
-            }),
-        ],
-    },
+	{ // JS Bundle
+		input,
+		output: {
+			file: `${output_dir}/gobjectify.js`,
+			format: "esm",
+			banner,
+		},
+		plugins: [
+			typescript({
+				tsconfig,
+				compilerOptions: {
+					removeComments: true,
+				},
+			}),
+		],
+	},
+	{ // TS Bundle
+		input,
+		output: {
+			file: `${output_dir}/gobjectify.d.ts`,
+			format: "esm",
+			banner: banner + "\n// @ts-nocheck - Skip checking, to ensure this library wont cause issues for users with different TypeScript setups.",
+		},
+		plugins: [
+			dts({
+				tsconfig,
+				compilerOptions: {
+					removeComments: false,
+				},
+			}),
+		],
+	},
 ]
