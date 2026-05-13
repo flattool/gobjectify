@@ -1,12 +1,15 @@
-import Gtk from "gi://Gtk?version=4.0"
+import GObject from "gi://GObject?version=2.0"
 
-import { GClass, from, Signal, Narrow, Int32 } from "./src/gobjectify"
+import { from, Signal } from "./src/gobjectify"
 
-@GClass()
-export class MyBox extends from(Gtk.Box, {
-	clicked: Signal([Narrow(Int32)<0 | 1>()], { return_type: String }),
+class One {
+	one = "one"
+}
+
+class Box extends from(GObject.Object, {
+	clicked: Signal([]),
 }) {
 	ready(): void {
-		this.$emit("clicked", 1)
+		this.$emit("clicked")
 	}
 }

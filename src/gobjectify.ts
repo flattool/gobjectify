@@ -17,39 +17,21 @@ import {
 	Property,
 	num_sizes_and_spec,
 } from "./property.js"
-// import {
-// 	type SignalDescriptor,
-// 	type SignalArgument,
-// 	type SignalOverrides,
-// 	type RegisterableSignal,
-// 	Signal,
-// 	is_signal_descriptor,
-// 	type SignalsOf,
-// } from "./signal.js"
 import {
-	SignalDescriptor,
+	type SignalDescriptor,
+	type SignalArgument,
 	type SignalOverrides,
-	type SignalsOf,
 	type RegisterableSignal,
 	Signal,
 	is_signal_descriptor,
-} from "./signal2.js"
+	type SignalsOf,
+} from "./signal.js"
 import {
 	type ActionDescriptor,
 	type ExtractActions,
 	SimpleAction,
 	is_action_descriptor,
 } from "./simple_action.js"
-import {
-	type BaseTypes,
-	type TypeDescriptor,
-	// type InstanceFor,
-	// type InstancesForArray,
-	Int32,
-	UInt32,
-	Narrow,
-	gtype_for,
-} from "./types.js"
 import { ConstMap } from "./const_map.js"
 import GLib from "gi://GLib?version=2.0"
 
@@ -382,7 +364,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				} else if (is_action_descriptor(value)) {
 					actions.set(name, value)
 				} else if (is_signal_descriptor(value)) {
-					signals[name.replaceAll("_", "-")] = value.signal
+					signals[name.replaceAll("_", "-")] = value.create()
 				}
 			}
 
@@ -944,7 +926,4 @@ export {
 	Property,
 	Child,
 	SimpleAction,
-	Narrow,
-	Int32,
-	UInt32,
 }
