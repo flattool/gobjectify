@@ -17,21 +17,39 @@ import {
 	Property,
 	num_sizes_and_spec,
 } from "./property.js"
+// import {
+// 	type SignalDescriptor,
+// 	type SignalArgument,
+// 	type SignalOverrides,
+// 	type RegisterableSignal,
+// 	Signal,
+// 	is_signal_descriptor,
+// 	type SignalsOf,
+// } from "./signal.js"
 import {
-	type SignalDescriptor,
-	type SignalArgument,
+	SignalDescriptor,
 	type SignalOverrides,
+	type SignalsOf,
 	type RegisterableSignal,
 	Signal,
 	is_signal_descriptor,
-	type SignalsOf,
-} from "./signal.js"
+} from "./signal2.js"
 import {
 	type ActionDescriptor,
 	type ExtractActions,
 	SimpleAction,
 	is_action_descriptor,
 } from "./simple_action.js"
+import {
+	type BaseTypes,
+	type TypeDescriptor,
+	// type InstanceFor,
+	// type InstancesForArray,
+	Int32,
+	UInt32,
+	Narrow,
+	gtype_for,
+} from "./types.js"
 import { ConstMap } from "./const_map.js"
 import GLib from "gi://GLib?version=2.0"
 
@@ -51,7 +69,7 @@ type Descriptor<D, T extends GObject.Object> = {
 			? ChildDescriptor<GObject.Object>
 			: Key extends keyof T["$signals"]
 				? PropertyDescriptor<any, any>
-				: PropertyDescriptor<any, any> | SignalDescriptor<SignalArgument[], SignalArgument | void>
+				: PropertyDescriptor<any, any> | SignalDescriptor<any[], any>
 		) | (T extends Gtk.Application | Gtk.ApplicationWindow | Gtk.Widget
 			? ActionDescriptor
 			: never
@@ -364,7 +382,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				} else if (is_action_descriptor(value)) {
 					actions.set(name, value)
 				} else if (is_signal_descriptor(value)) {
-					signals[name.replaceAll("_", "-")] = value.create()
+					signals[name.replaceAll("_", "-")] = value.signal
 				}
 			}
 
@@ -926,4 +944,7 @@ export {
 	Property,
 	Child,
 	SimpleAction,
+	Narrow,
+	Int32,
+	UInt32,
 }
