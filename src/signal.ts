@@ -36,6 +36,7 @@ type ExtractSignals<D> = {
 }
 
 type UnwrapSignalArg<T> = (
+	T extends ObjectConstructor ? object :
 	T extends GObject.GType<infer G> ? G :
 	T extends { $gtype: GObject.GType<infer G> } ? G :
 	T extends abstract new (...args: any[]) => infer O ? O :
