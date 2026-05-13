@@ -3,11 +3,9 @@ import GObject from "gi://GObject?version=2.0"
 const SIGNAL_SYMBOL = Symbol("Symbol for GObjectify Signal descriptors")
 
 type SignalArgument = (
-	NumberConstructor
-	| StringConstructor
-	| BooleanConstructor
 	| GObject.GType
 	| { $gtype: GObject.GType }
+	| (abstract new (...args: any[]) => any)
 )
 
 type RegisterableSignal = {
@@ -38,19 +36,10 @@ type ExtractSignals<D> = {
 }
 
 type UnwrapSignalArg<T> = (
-	T extends NumberConstructor
-		? number
-		: T extends StringConstructor
-			? string
-			: T extends BooleanConstructor
-				? boolean
-				: T extends abstract new (...args: any[]) => infer I
-					? I
-					: T extends { $gtype: GObject.GType<infer U> }
-						? U
-						: T extends GObject.GType<infer U>
-							? U
-							: T
+	T extends GObject.GType<infer G> ? G :
+	T extends { $gtype: GObject.GType<infer G> } ? G :
+	T extends abstract new (...args: any[]) => infer O ? O :
+	T
 )
 
 type UnwrapSignalArgs<T extends readonly unknown[]> = {
@@ -154,11 +143,9 @@ type SignalOverrides<T extends GObject.Object, D> = {
 }
 
 const signal_descriptor_args_to_gtypes = (item: SignalArgument): GObject.GType => {
-	if (item === Number) return GObject.TYPE_BOOLEAN
-	if (item === String) return GObject.TYPE_STRING
-	if (item === Boolean) return GObject.TYPE_BOOLEAN
 	if ("$gtype" in item) return item.$gtype
-	throw new Error(`Attempted to register a GObjectify signal with a non-GObject.GType: '${item}'`)
+	if (typeof item === "function") return GObject.TYPE_JSOBJECT
+	return item // known to be a GObject.GType
 }
 
 /**
