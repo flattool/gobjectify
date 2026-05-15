@@ -1,15 +1,6 @@
 ## Utilities and Decorators
 Along with the core improvements GObjectify adds to GNOME JS, GObjectify also provides a set of extra quality-of-life utilities as well.
 
-## TODO:
-ConstMap \
-Debounce \
-Notify \
-WatchProp \
-OnSignal \
-OnSimpleAction \
-PostInit
-
 ---
 
 ## `dedent()`
@@ -79,6 +70,9 @@ async function () {
 }
 ```
 
+## `ConstMap`
+TODO
+
 ## `@Debounce()`
 ```ts
 function Debounce(
@@ -93,5 +87,103 @@ function Debounce(
 
 Method decorator that will pause calls to its method if previous calls have been made within its `milliseconds` of wait-time.
 
+```ts
+@GClass()
+class MyBox extends from(Gtk.Box, {}) {
+	count = 0
+
+	@Debounce(200)
+	some_method(): void {
+		this.count += 1
+		print(`Called ${count} time(s)`)
+	}
+
+	async main(): Promise<void> {
+		this.some_method() // Called 1 time(s)
+		this.some_method() // Called 1 time(s)
+		await timeout_ms(200)
+		this.some_method() // Called 2 time(s)
+		this.some_method() // Called 2 time(s)
+	}
+}
 ```
-@Debounce(200)
+
+## `@Notify()`
+```ts
+function Notify(): void
+```
+
+Setter accessor decorator that will emit the notify signal for computed property.
+
+```ts
+@GClass()
+class MyBox extends from(Gtk.Box, {
+	item_id: Property.string(),
+}) {
+	#item_id = ""
+	override get item_id(): string {
+		return this.#item_id
+	}
+	@Notify // automatically emits the "notify::item-id" signal
+	override set item_id(v: string) {
+		this.#item_id = v
+	}
+}
+```
+
+## `@WatchProp()`
+```ts
+function WatchProp(property_name: string): MethodDecorator
+```
+
+Method decorator that will run its method whenever the specified property changes.
+
+The method will be called asynchronously on idle after class instantiation, and will be ran any time the property's value changes.
+
+```ts
+@GClass()
+class MyBox extends from(Gtk.Box, {
+	title: Property.string(),
+}) {
+	@WatchProp("title")
+	#on_title_changed(): void {
+		print(`My title is: ${this.title}`)
+	}
+}
+
+const mb = new MyBox({ title: "File Size" }) // "My title is: File Size" prints on next idle
+// Some time later
+mb.title = "User Name"
+```
+
+Note: the property name is exactly as it appears in the `from` function. This means that underscores are permitted, and will be automatically converted to hyphens at runtime.
+
+## `@OnSignal()`
+```ts
+function OnSignal(signal_name: string): MethodDecorator
+```
+
+Method decorator that will connect its method to the signal an instance of the class.
+
+```ts
+@GClass()
+class MyBox extends from(Gtk.Button, {
+	state_set: Signal(Number),
+}) {
+	@OnSignal("state-set") // Connect to a new signal
+	#on_state_set(new_state: number): void {
+		print(`State has been set to: ${new_state}`)
+	}
+
+	@OnSignal("clicked") // Connect to a built-in signal
+	#on_clicked(): void {
+		print("I have been clicked!")
+	}
+}
+```
+
+## `@OnSimpleAction`
+TODO
+
+## `@PostInit`
+TODO
