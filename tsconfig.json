@@ -8,10 +8,6 @@
 		"moduleResolution": "bundler",
 		"forceConsistentCasingInFileNames": true,
 
-		"paths": {
-			"gi://*": ["./gir-ts-types/*"],
-		},
-
 		// Optional Flags
 		"allowUnreachableCode": false,
 		"allowUnusedLabels": false,
