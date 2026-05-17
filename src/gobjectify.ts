@@ -62,7 +62,7 @@ type GClassFor<T extends GObject.Object> = new (...args: any[])=> T
 type AbstractGClassFor<T extends GObject.Object> = abstract new (...args: any[])=> T
 
 type ValidConstructorProps<D> = {
-	[K in keyof (ExtractConstructProps<D> & ExtractWriteableProps<D>)]?: (ExtractConstructProps<D> & ExtractWriteableProps<D>)[K]
+	[K in keyof ExtractConstructProps<D>]?: ExtractConstructProps<D>[K]
 }
 
 type ResultingConstructorParamsObj<
@@ -411,6 +411,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 			}
 
 			// makes "readonly" flagged properties throw when set after this point
+			// TODO: make computed properties throw when set before this point!
 			this[INIT_FINISHED_SYMBOL] = true
 
 			return original_return_val
