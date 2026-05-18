@@ -259,7 +259,7 @@ const Property = {
 		 * Property.gobject(Gtk.Widget).as<Gtk.ListBox | Gtk.Box>() // This property now only allows instances of Box or ListBox, instead of all widgets
 		 * ```
 		 */
-		as<Narrow>(): InstanceType<G> extends Narrow ? PropertyDescriptor<Narrow, FlagsFor<F>> : [never] & void
+		as<Narrow extends InstanceType<G>>(): PropertyDescriptor<Narrow, FlagsFor<F>>
 	} {
 		const flags = flag ?? DEFAULT_FLAG
 		return {
