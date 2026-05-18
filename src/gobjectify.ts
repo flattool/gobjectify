@@ -13,9 +13,9 @@ import {
 	type ExtractConstructProps,
 	type ExtractReadonlyProps,
 	type ExtractWriteableProps,
+	type ParamFlagStrings,
 	is_property_descriptor,
 	Property,
-	num_sizes_and_spec,
 } from "./property.js"
 import {
 	type SignalDescriptor,
@@ -187,74 +187,83 @@ function from<
 	return Base as any
 }
 
-const make_numeric_accessors = (
-	spec: GObject.ParamSpec<number>,
-	desc: globalThis.PropertyDescriptor,
-	kind: "int32" | "uint32" | "double",
-	prop?: PropertyDescriptor<any, any>,
-): { get(): number, set(val: number): void } => {
-	const defaults = num_sizes_and_spec.get(kind)
-	const min = prop?.min ?? defaults.min
-	const max = prop?.max ?? defaults.max
-	const is_double = kind === "double"
-	return {
-		get() {
-			const val: number | null | undefined = desc.get?.call?.(this)
-			if (val === null || val === undefined) {
-				const def = spec.get_default_value() as number
-				if (def > max) return max
-				if (def < min) return min
-				return def
-			}
-			return val
-		},
-		set(val) {
-			if (val > max) {
-				val = max
-			} else if (val < min) {
-				val = min
-			}
-			if (!is_double) {
-				val = Math.trunc(val)
-			}
-			desc.set?.call?.(this, val)
-		},
-	}
-}
+// const make_non_numeric_accessors = (
+// 	spec: GObject.ParamSpec<number>,
+// 	desc: globalThis.PropertyDescriptor,
+// 	prop_name: string,
+// 	class_name: string,
+// 	prop?: PropertyDescriptor<any, any>,
+// ): { get(): any, set(val: any): void } => {
+// 	let set: (val: any)=> void
+// 	if (prop?.flags === "readonly") {
+// 		set = function (this: any, val): void {
+// 			if (this[INIT_FINISHED_SYMBOL]) {
+// 				throw new Error(`Property '${prop_name}' in GClass decorated class '${class_name}' is readonly and cannot be set after initialization.`)
+// 			}
+// 			desc.set?.call?.(this, val ?? null)
+// 		}
+// 	} else {
+// 		set = function (this: any, val): void {
+// 			desc.set?.call?.(this, val ?? null)
+// 		}
+// 	}
+// 	return {
+// 		get(): any {
+// 			return desc.get?.call?.(this) ?? spec.get_default_value() ?? null
+// 		},
+// 		set,
+// 	}
+// }
 
-const make_non_numeric_accessors = (
-	spec: GObject.ParamSpec<number>,
-	desc: globalThis.PropertyDescriptor,
-	prop_name: string,
+const make_accessors = (
 	class_name: string,
-	prop?: PropertyDescriptor<any, any>,
+	prop_name: string,
+	prop: PropertyDescriptor<any, ParamFlagStrings>,
+	desc: globalThis.PropertyDescriptor,
+	spec: GObject.ParamSpec,
 ): { get(): any, set(val: any): void } => {
-	let set: (val: any)=> void
-	if (prop?.flags === "readonly") {
-		set = function (this: any, val): void {
+	let get: (this: any) => any
+	let set: (this: any, val: any) => void
+	if (prop.flags === "readonly") {
+		get = function () {
+			return prop.validate_value(desc.get!.call(this), spec)
+		}
+		set = function (val) {
 			if (this[INIT_FINISHED_SYMBOL]) {
-				throw new Error(`Property '${prop_name}' in GClass decorated class '${class_name}' is readonly and cannot be set after initialization.`)
+				throw new Error(dedent`
+					GClass: ${class_name}
+					Readonly property '${prop_name}' cannot be set after initialization.
+					}
+				`)
 			}
-			desc.set?.call?.(this, val ?? null)
+			desc.set!.call(this, prop.validate_value(val, spec))
+		}
+	} else if (prop.flags === "computed") {
+		get = function () {
+			if (!this[INIT_FINISHED_SYMBOL]) {
+				return prop.validate_value(spec.get_default_value(), spec)
+			}
+			return prop.validate_value(desc.get!.call(this), spec)
+		}
+		set = function (val) {
+			if (!this[INIT_FINISHED_SYMBOL]) {
+				throw new Error(dedent`
+					GClass: ${class_name}
+					Computed property '${prop_name}' cannot be set during initialization.
+				`)
+			}
+			desc.set!.call(this, prop.validate_value(val, spec))
 		}
 	} else {
-		set = function (this: any, val): void {
-			desc.set?.call?.(this, val ?? null)
+		get = function () {
+			return prop.validate_value(desc.get!.call(this), spec)
+		}
+		set = function (val) {
+			desc.set!.call(this, prop.validate_value(val, spec))
 		}
 	}
-	return {
-		get(): any {
-			return desc.get?.call?.(this) ?? spec.get_default_value() ?? null
-		},
-		set,
-	}
+	return { get, set }
 }
-
-const numeric_kind_from_gtype = new Map<GObject.GType, "int32" | "uint32" | "double">([
-	[GObject.TYPE_INT, "int32"],
-	[GObject.TYPE_UINT, "uint32"],
-	[GObject.TYPE_DOUBLE, "double"],
-])
 
 /**
  * Class decorator to define a GObject/Gtk class with properties, children, actions, and signals.
@@ -442,11 +451,8 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				`)
 			}
 			const prop: PropertyDescriptor<any, any> | undefined = property_descriptors[key]
-			const kind: "int32" | "uint32" | "double" | undefined = numeric_kind_from_gtype.get(spec.value_type)
-			const accessors = (kind
-				? make_numeric_accessors(spec, desc, kind, prop)
-				: make_non_numeric_accessors(spec, desc, key, target.name, prop)
-			)
+			if (!prop) continue
+			const accessors = make_accessors(target.name, key, prop, desc, spec)
 			Object.defineProperty(prototype, key, {
 				configurable: desc.configurable ?? true,
 				enumerable: desc.enumerable ?? true,

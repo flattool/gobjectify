@@ -31,6 +31,7 @@ type PropertyDescriptor<Value, Flags extends ParamFlagStrings> = {
 	readonly flags: Flags,
 	readonly property_symbol: typeof PROPERTY_SYMBOL,
 	create(name: string): GObject.ParamSpec,
+	validate_value(value: any, spec: GObject.ParamSpec): Value,
 }
 
 type PrimitiveCastable<Wide, Default, F extends ParamFlagStrings> = {
@@ -106,6 +107,18 @@ function numeric_prop(kind: "int32" | "uint32" | "double") {
 			max,
 			create: (name) => spec(name, null, null, FLAG_PRESETS[flags], min, max, default_value),
 			as(): any { return this },
+			validate_value: (value, spec) => {
+				value ??= spec.get_default_value() ?? min
+				if (value < min) {
+					value = min
+				} else if (value > max) {
+					value = max
+				}
+				if (kind !== "double") {
+					value = Math.trunc(value)
+				}
+				return value
+			}
 		}
 	}
 }
@@ -185,6 +198,7 @@ const Property = {
 			property_symbol: PROPERTY_SYMBOL,
 			create: (name) => GObject.ParamSpec.string(name, null, null, FLAG_PRESETS[flags], default_value),
 			as(): any { return this },
+			validate_value: (value, spec) => value ?? spec.get_default_value() ?? "",
 		}
 	},
 	/**
@@ -213,6 +227,7 @@ const Property = {
 			property_symbol: PROPERTY_SYMBOL,
 			create: (name) => GObject.ParamSpec.boolean(name, null, null, FLAG_PRESETS[flags], default_value),
 			as(): any { return this },
+			validate_value: (value, spec) => value ?? spec.get_default_value() ?? false,
 		}
 	},
 	/**
@@ -252,6 +267,7 @@ const Property = {
 			property_symbol: PROPERTY_SYMBOL,
 			create: (name) => GObject.ParamSpec.object(name, null, null, FLAG_PRESETS[flags], kind.$gtype),
 			as(): any { return this },
+			validate_value: (value) => value ?? null,
 		}
 	},
 	/**
@@ -275,7 +291,8 @@ const Property = {
 		return {
 			flags: flags as any,
 			property_symbol: PROPERTY_SYMBOL,
-			create: (name) => GObject.ParamSpec.enum(name, null, null, FLAG_PRESETS[flags], kind.$gtype, default_value)
+			create: (name) => GObject.ParamSpec.enum(name, null, null, FLAG_PRESETS[flags], kind.$gtype, default_value),
+			validate_value: (value) => value ?? default_value,
 		}
 	},
 	/**
@@ -313,6 +330,7 @@ const Property = {
 			property_symbol: PROPERTY_SYMBOL,
 			create: (name) => GObject.ParamSpec.jsobject(name, null, null, FLAG_PRESETS[flags]),
 			as(): any { return this },
+			validate_value: (value) => value ?? null,
 		}
 	},
 } as const
@@ -321,5 +339,5 @@ const is_property_descriptor = (item: any): item is PropertyDescriptor<any, Para
 	item?.property_symbol === PROPERTY_SYMBOL
 )
 
-export { Property, is_property_descriptor, num_sizes_and_spec }
-export type { PropertyDescriptor, ExtractWriteableProps, ExtractReadonlyProps, ExtractConstructProps }
+export { Property, is_property_descriptor }
+export type { PropertyDescriptor, ExtractWriteableProps, ExtractReadonlyProps, ExtractConstructProps, ParamFlagStrings }
