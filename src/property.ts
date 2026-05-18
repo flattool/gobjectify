@@ -84,14 +84,14 @@ const num_sizes_and_spec = new ConstMap(
 function numeric_prop(kind: "int32" | "uint32" | "double") {
 	const { min: default_min, max: default_max, spec } = num_sizes_and_spec.get(kind)
 	return <N extends number | undefined, F extends ParamFlagStrings | undefined>(
-		flag: F = DEFAULT_FLAG as F,
+		flag?: F,
 		...args: (
 			F extends "computed" ? [] :
 			F extends "const" ? [default_value: N, config?: MinMax] :
 			[default_value?: N, config?: MinMax]
 		)
 	): PropertyDescriptor<number, FlagsFor<F>> & PrimitiveCastable<number, N, FlagsFor<F>> => {
-		const flags = flag as ParamFlagStrings
+		const flags = flag ?? DEFAULT_FLAG
 		const config = args[1]
 		const min = config?.min ?? default_min
 		const max = config?.max ?? default_max
@@ -100,7 +100,7 @@ function numeric_prop(kind: "int32" | "uint32" | "double") {
 			`Default value '${default_value}' is out of range for property of type '${kind}' with min '${min}' and max '${max}'`
 		)
 		return {
-			flags: flag as any,
+			flags: flags as any,
 			property_symbol: PROPERTY_SYMBOL,
 			min,
 			max,
@@ -179,9 +179,9 @@ const Property = {
 		)
 	): PropertyDescriptor<string, FlagsFor<F>> & PrimitiveCastable<string, S, FlagsFor<F>> {
 		const default_value = args[0] ?? ""
-		const flags = flag as ParamFlagStrings
+		const flags = flag ?? DEFAULT_FLAG
 		return {
-			flags: flag as any,
+			flags: flags as any,
 			property_symbol: PROPERTY_SYMBOL,
 			create: (name) => GObject.ParamSpec.string(name, null, null, FLAG_PRESETS[flags], default_value),
 			as(): any { return this },
@@ -199,7 +199,7 @@ const Property = {
 	 * `"computed"` properties cannot accept a default, `"const"` properties require a default.
 	 */
 	bool<B extends boolean | undefined, F extends ParamFlagStrings | undefined>(
-		flag: F,
+		flag?: F,
 		...args: (
 			F extends "computed" ? [] :
 			F extends "const" ? [default_value?: B] :
@@ -207,9 +207,9 @@ const Property = {
 		)
 	): PropertyDescriptor<boolean, FlagsFor<F>> & PrimitiveCastable<boolean, B, FlagsFor<F>> {
 		const default_value = args[0] ?? false
-		const flags = flag as ParamFlagStrings
+		const flags = flag ?? DEFAULT_FLAG
 		return {
-			flags: flag as any,
+			flags: flags as any,
 			property_symbol: PROPERTY_SYMBOL,
 			create: (name) => GObject.ParamSpec.boolean(name, null, null, FLAG_PRESETS[flags], default_value),
 			as(): any { return this },
@@ -246,9 +246,9 @@ const Property = {
 		 */
 		as<Narrow>(): InstanceType<G> extends Narrow ? PropertyDescriptor<Narrow, FlagsFor<F>> : [never] & void
 	} {
-		const flags = flag as ParamFlagStrings
+		const flags = flag ?? DEFAULT_FLAG
 		return {
-			flags: flag as any,
+			flags: flags as any,
 			property_symbol: PROPERTY_SYMBOL,
 			create: (name) => GObject.ParamSpec.object(name, null, null, FLAG_PRESETS[flags], kind.$gtype),
 			as(): any { return this },
@@ -269,11 +269,11 @@ const Property = {
 	genum<G extends number, F extends Exclude<ParamFlagStrings, "computed"> | undefined>(
 		kind: GEnum<G>,
 		default_value: G,
-		flag: F = DEFAULT_FLAG as F,
+		flag?: F,
 	): PropertyDescriptor<G, FlagsFor<F>> {
-		const flags = flag as ParamFlagStrings
+		const flags = flag ?? DEFAULT_FLAG
 		return {
-			flags: flag as any,
+			flags: flags as any,
 			property_symbol: PROPERTY_SYMBOL,
 			create: (name) => GObject.ParamSpec.enum(name, null, null, FLAG_PRESETS[flags], kind.$gtype, default_value)
 		}
@@ -307,9 +307,9 @@ const Property = {
 		 */
 		as<Narrow extends object>(): PropertyDescriptor<Narrow | null, FlagsFor<F>>
 	} {
-		const flags = flag as ParamFlagStrings
+		const flags = flag ?? DEFAULT_FLAG
 		return {
-			flags: flag as any,
+			flags: flags as any,
 			property_symbol: PROPERTY_SYMBOL,
 			create: (name) => GObject.ParamSpec.jsobject(name, null, null, FLAG_PRESETS[flags]),
 			as(): any { return this },
