@@ -6,7 +6,7 @@ GObjectify is a TypeScript library for GJS designed to dramatically improve the 
 It provides:
 - **Strong type safety**: GObject properties, template children, signals, actions, and interfaces are all fully typed
 - **Declarative class definitions**: Decorators and mixins allow GObject subclassing without manual class registration
-- **Main-loop helpers**: `timeout_ms`, `next_idle`, and `connect_async` integrate cleanly with GLib
+- **Main-loop helpers**: `timeout_ms`, `next_idle`, and typed signal awaiting integrate cleanly GLib
 - **Quality-of-life utilities**: `dedent`, `ConstMap`, and others reduce common GJS friction
 - **Zero-boilerplate subclassing**: Define properties, actions, and template children in one place, GObjectify handles the rest
 
@@ -14,183 +14,119 @@ Whether you're making GTK widgets, GObject data classes, or complex, data-driven
 
 # Why GObjectify?
 
-Writing GObject subclasses in plain GJS, or plain GJS with TS, is very verbose and error-prone:
-- Property specs must be manually defined (and numerical props do not respect min/max values)
-- Simple actions require complex and explicit setup
-- Template children need correct naming and TS-aware syntax
-- Boilerplate `registerClass` code grows quickly, and pollutes simple class files
-- Signals must be defined as object literals with deeply nested structures
-- Constructors are entirely untyped despite their very complex and strict behavior in GObject
-- Constant and Construct-Only flagged properties aren't enforced as readonly in TS
+Writing GObject subclasses in plain GJS with TypeScript is verbose and error-prone:
+- Property specs must be manually defined, and numerical props do not clamp to min/max values
+- Simple Actions require explicit action group setup and repetitive, manual wiring
+- Template children need correct naming conventions and manual type annotations, which aren't enforced at compile time
+- `registerClass` boilerplate grows quickly and pollutes otherwise simple class files
+- Signals are defined as untyped object literals, and their arguments and callbacks are all `any`
+- Constructor overrides offer no help enforcing the strict object arguments and behavior that GObject requires
 
-GObjectify fixes all of this! With a single declarative descriptor, you define properties, template children, simple actions, and implemented interfaces, all automatically typed and wired into the GObject system.
-
-GObjectify acts as a thin, type-safe layer over GObject, not a framework, so everything remains 100% compatible with GJS, GTK, and GNOME platform APIs.
+GObjectify acts as a thing, type-safe later over GObject, and is not a framework. Everything remains 100% compatible with GJS, GTK, and GNOME platform APIs.
 
 Here is an example:
+
 ```ts
-@GClass()
+@GClass({ template: "resource:///org/example/my_widget.ui" })
 export class MyWidget extends from(Gtk.Box, {
-  _button: Child<Gtk.Button>(),
-  title: Property.string({ default: "Hello" }),
-  click: SimpleAction(),
-  some_signal: Signal(),
+	title: Property.string(),
+	edited: Signal([String]),
+	refresh: SimpleAction(),
+	_button: Child<Gtk.Button>(),
 }) {
-  constructor(params: typeof MyWidget.$params) {
-    super(params)
-    print(`MyWidget with title '${this.title}' is fully constructed!`)
-  }
+	constructor(params?: typeof MyWidget.$params) {
+		super(params)
+		print(`MyWidget with title '${this.title}' is fully constructed!`)
+	}
 
-  @OnSimpleAction("click")
-  on_click(): void {
-    print(`Clicked: ${this.title}`)
-    this.$emit("some-signal")
-  }
+	@OnSignal("edited")
+	#on_edited(contents: string): void {
+		print("Edited to:", contents)
+	}
 
-  @WatchProp("title")
-  on_title_changed(): void {
-    print(`My title was changed to: ${this.title}`)
-  }
+	@OnSimpleAction("refresh")
+	#refresh(): void {
+		print("Refreshing...")
+	}
 }
 ```
-and that's it! No `registerClass`, no `ParamSpec`, no custom action groups. All of it is automatically handled for you! And the best part, all of this is type-safe, which means you can't accidentally set up something incorrectly, or assign the wrong kind of value.
+
+No `registerClass`, no `ParamSpec`, no action group setup, no untyped signal strings! Al of its automatically handled, and all of it is type-safe.
 
 # Installation
 
-GNOME JS is *NOT* a browser or Node environment, which means you cannot install libraries from NPM or import packages the same way you would for web or Node. Because of this, GObjectify must be installed by dropping its files into your project.
+GNOME JS is *NOT* a browser or Node environment, and as such, libraries cannot be installed from NPM or imported the same way as web/Node projects. Because of this, GObjectify is distributed as a pair of compiled files should live in your project's source directory.
 
 ## Dependencies
 
-The only dependency of GObjectify is TS types for GObject introspection. You can generate your own with `ts-for-gir`, but we recommend using [Flattool's already generated types](https://github.com/flattool/gir-ts-types). They are pre-generated, versioned, and match the GNOME SDK runtimes used on Flathub.
+The only dependency of GObjectify is TypeScript types for GObject introspection. You can generate your own with `ts-for-gir`, but we recommend using [Flattool's pre-generated types](https://github.com/flattool/gir-ts-types), which are versioned and match the GNOME SDK runtimes used on Flathub.
 
-## 1. Download the library
+## 1. Download GObjectify
 
-- Grab `gobjectify.js` and `gobjectify.d.ts` from Releases
-- Place them into your `src/` directory.
+Grab `gobjectify.js` and `gobjectify.d.ts` from the [latest release](https://github.com/flattool/gobjectify/releases/latest) and place them in your project's source directory:
 
-```sh
-your-project/
-  src/
-    your_code.ts
-    gobjectify/   # create this folder if you'd like
-      gobjectify.d.ts
-      gobjectify.js
-  tsconfig.json
+```
+project-root/
+	src/
+		your_code.ts
+		gobjectify/   # create this folder if you'd like
+			gobjectify.d.ts
+			gobjectify.js
+	tsconfig.json
 ```
 
-This keeps import paths short, and keeps GObjectify next to your application code.
+## 2. Ensure TypeScript 5.0 Decorators are used
 
-## 2. Make sure TypeScript 5.0 decorators are being used
+GObjectify uses the standardized ECMAScript decorator model introduced in TypeScript 5.0. In your `tsconfig.json`, make sure `"experimentalDecorators"` is either absent or set to `false`.
 
-GObjectify uses the standardized ECMAScript decorator model introduced in TypeScript 5.0.
+And that's it! You now have GObjectify, and can continue on to making use of it.
 
-In your `tsconfig.json`, make sure `"experimentalDecorators"` is set to `false`. (False is the default, so if you don't see this option in the file, you're good).
+## Quick Start
 
-# Quick Start
-
-## 1. Define a base class with `from()`
-
-The `from()` function creates a typed abstract class describing your GObject members.\
-Note: do *NOT* try to instantiate from this class, you *MUST* subclass it!
+The following code is an example of a widget subclass that displays a count, with numbers to increase or decrease the count. The [wiki](https://github.com/flattool/gobjectify/wiki) contains more documentation and guides.
 
 ```ts
-import { from, Property, Child, SimpleAction } from "./gobjectify/gobjectify.js"
+import Gtk from "gi://Gtk?version=4.0"
+import { from, GClass, Property, Child, WatchProp } from "./gobjectify/gobjectify.js" // or wherever you put the library
 
-const Base = from(Gtk.Box, {
-  _button: Child<Gtk.Button>(),
-  title: Property.string({ default: "My Widget" }),
-  activate: SimpleAction(),
-})
-```
-
-This metadata defines the structure for your subclass.
-
-## 2. Create your subclass with `@GClass`
-
-The GClass decorator is the other half of the magic; It tells GObject to register the class, and you can add a template UI resource, css_name, custom GType name instead of using the class name, and any GType flags you'd like.
-
-```ts
-// This code is continued in the same file from Step 1
-import { GClass, OnSimpleAction } from "./gobjectify/gobjectify.js"
-
-@GClass({ template: "resource:///org/example/ui/my_widget.ui" })
-export class MyWidget extends Base {
-  @OnSimpleAction("activate")
-  #do_activate(): void {
-    print(`Widget with title '${this.title}' activated!`)
-  }
-
-  constructor() {
-    // now the activate function can be triggered with the button or with the action
-    this._button.connect("clicked", () => this.#do_activate())
-  }
-}
-```
-
-GObjectify automatically:
-- Registers the GObject properties
-- Binds template children
-- Installs SimpleActions
-- Connects `@OnSimpleAction` handlers
-
-# An Example: Gtk Application Window with a counter
-
-```ts
-@GClass({ template: "resource:///org/example/ui/my_widget.ui" })
-export class MainWindow extends from(Gtk.ApplicationWindow, {
-  count: Property.uint32(),
-  _increment_btn: Child<Gtk.Button>(),
-  _decrement_btn: Child<Gtk.Button>(),
-  _count_lbl: Child<Gtk.Label>(),
+@GClass({ template: "resource:///org/example/counter.ui" })
+export class Counter extends from(Gtk.Box, {
+	count: Property.uint32(),
+	_info_label: Child<Gtk.Label>(),
+	_increment: Child<Gtk.Button>(),
+	_decrement: Child<Gtk.Button>(),
 }) {
-  @PostInit
-  setup_connections(): void {
-    this._increment_btn.connect("clicked", () => this.count++)
-    this._decrement_btn.connect("clicked", () => this.count--)
-  }
+	constructor(params?: typeof Counter.$params) {
+		super(params)
+		this._increment.$connect("clicked", () => this.count += 1)
+		this._decrement.$connect("clicked", () => this.count -= 1)
+	}
 
-  @WatchProp("count")
-  #on_count_change(): void {
-    this._count_lbl.label = `Count at: ${this.count}`
-  }
+	@WatchProp("count")
+	#on_count_changed(): void {
+		this._info_label.label = `Clicked ${this.count} times`
+	}
 }
 ```
 
-Here, GObjectify registers the class with a UI template, binds the internal widgets, creates the GObject properties, binds the `on_count_change` function to the notify signal for `count` and also calls it and `setup_connections` (which handles our button click connections) on idle after initialization.
+*For information on everything in this snippet (and more!), see the [wiki](https://github.com/flattool/gobjectify/wiki).*
 
-Tip: Using UI bound properties can reduce this code even more! (Not demonstrated here, as UI files are out of GObjectify's scope, other than registering templates)
+# Build from Source
 
-# Advanced Features
+Ensure you have [NPM](https://www.npmjs.com/) installed, as GObjectify uses [Rollup](https://www.npmjs.com/package/rollup) to compile into a single `.js` and `.d.ts` file.
 
-GObjectify also includes a number of small but powerful, advanced tools to make your life easier:
-
-- **Debounced methods**: `@Debounce(ms)` to limit how often a method runs, perfect for rapid events
-- **Self signal connections** `@OnSignal("signal-name")` on methods to run that method when a signal on the instance is emitted
-- **Automatic notifications**: `@Notify` on setters triggers GObject property notifications automatically
-- **Async signal handling**: `obj.$connect_async` to `await` signals like promises, avoiding messy callbacks
-
-# Building from Source
-
-Ensure you have [NPM](https://www.npmjs.com/) installed, as GObjectify utilizes [Rollup](https://www.npmjs.com/package/rollup) to compile into one `.js` file and one `.d.ts` file.
-
-### 1. Clone this repo and enter it:
 ```sh
+# Clone the repo
 git clone https://github.com/flattool/gobjectify
 cd gobjectify
-```
 
-### 2. Clone the required types submodule
-```sh
+# Initialize the types submodule
 git submodule update --init --recursive
-```
 
-### 3. Install the needed NPM dependencies
-```sh
+# Install dependencies
 npm install
-```
 
-### 4. Build and bundle into the dual file release
-```sh
+# Build
 npm run build
+# => Output: 'dist/gobjectify.js' and 'dist/gobjectify.d.ts'
 ```
-This will create `dist/gobjectify.js` and `dist/gobjectify.d.ts`
