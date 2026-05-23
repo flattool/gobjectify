@@ -48,12 +48,7 @@ type UnwrapSignalArgs<T extends readonly unknown[]> = {
 }
 
 type SignalsOf<T extends GObject.Object> = {
-	[K in keyof T["$signals"] as string extends K
-		? never
-		: `notify::${string}` extends K
-			? never
-			: K
-	]: T["$signals"][K]
+	[K in keyof T["$signals"]]: T["$signals"][K]
 }
 
 type SignalOverrides<T extends GObject.Object, D> = {
