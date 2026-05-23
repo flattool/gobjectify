@@ -9,11 +9,11 @@ import {
 	Child,
 } from "./child.js"
 import {
-	type PropertyDescriptor,
+	type PropDescriptor,
 	type ExtractConstructProps,
 	type ExtractReadonlyProps,
 	type ExtractWriteableProps,
-	type ParamFlagStrings,
+	type FlagStrings,
 	is_property_descriptor,
 	Property,
 } from "./property.js"
@@ -50,8 +50,8 @@ type Descriptor<D, T extends GObject.Object> = {
 		: (Key extends `_${string}`
 			? ChildDescriptor<GObject.Object>
 			: Key extends keyof T["$signals"]
-				? PropertyDescriptor<any, any>
-				: PropertyDescriptor<any, any> | SignalDescriptor<any[], any>
+				? PropDescriptor<any, any>
+				: PropDescriptor<any, any> | SignalDescriptor<any[], any>
 		) | (T extends Gtk.Application | Gtk.ApplicationWindow | Gtk.Widget
 			? ActionDescriptor
 			: never
@@ -187,44 +187,16 @@ function from<
 	return Base as any
 }
 
-// const make_non_numeric_accessors = (
-// 	spec: GObject.ParamSpec<number>,
-// 	desc: globalThis.PropertyDescriptor,
-// 	prop_name: string,
-// 	class_name: string,
-// 	prop?: PropertyDescriptor<any, any>,
-// ): { get(): any, set(val: any): void } => {
-// 	let set: (val: any)=> void
-// 	if (prop?.flags === "readonly") {
-// 		set = function (this: any, val): void {
-// 			if (this[INIT_FINISHED_SYMBOL]) {
-// 				throw new Error(`Property '${prop_name}' in GClass decorated class '${class_name}' is readonly and cannot be set after initialization.`)
-// 			}
-// 			desc.set?.call?.(this, val ?? null)
-// 		}
-// 	} else {
-// 		set = function (this: any, val): void {
-// 			desc.set?.call?.(this, val ?? null)
-// 		}
-// 	}
-// 	return {
-// 		get(): any {
-// 			return desc.get?.call?.(this) ?? spec.get_default_value() ?? null
-// 		},
-// 		set,
-// 	}
-// }
-
 const make_accessors = (
 	class_name: string,
 	prop_name: string,
-	prop: PropertyDescriptor<any, ParamFlagStrings>,
-	desc: globalThis.PropertyDescriptor,
+	prop: PropDescriptor<any, FlagStrings>,
+	desc: PropertyDescriptor,
 	spec: GObject.ParamSpec,
 ): { get(): any, set(val: any): void } => {
 	let get: (this: any) => any
 	let set: (this: any, val: any) => void
-	if (prop.flags === "readonly") {
+	if (prop.flag === "readonly") {
 		get = function () {
 			return prop.validate_value(desc.get!.call(this), spec)
 		}
@@ -238,7 +210,7 @@ const make_accessors = (
 			}
 			desc.set!.call(this, prop.validate_value(val, spec))
 		}
-	} else if (prop.flags === "computed") {
+	} else if (prop.flag === "computed") {
 		get = function () {
 			if (!this[INIT_FINISHED_SYMBOL]) {
 				return prop.validate_value(spec.get_default_value(), spec)
@@ -312,7 +284,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 		const parent = Object.getPrototypeOf(target)
 		const maybe_metadata: unknown = (parent as any)?.[GOBJECTIFY_FROM_SYMBOL]
 		const properties: Record<string, GObject.ParamSpec<any>> = {}
-		const property_descriptors: Record<string, PropertyDescriptor<any, any>> = {}
+		const property_descriptors: Record<string, PropDescriptor<any, any>> = {}
 		const children: string[] = []
 		const actions = new Map<string, ActionDescriptor>()
 		const signals: Record<string, RegisterableSignal> = {}
@@ -336,7 +308,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 					const spec = value.create(name)
 					properties[name] = spec
 
-					const is_flagged_computed: boolean = value.flags === "computed"
+					const is_flagged_computed: boolean = value.flag === "computed"
 					const has_get_or_set: boolean = (
 						typeof (Object.getOwnPropertyDescriptor(prototype, name)?.get) === "function"
 						|| typeof (Object.getOwnPropertyDescriptor(prototype, name)?.set) === "function"
@@ -450,7 +422,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 					Writeable custom GObject property '${key}' is missing a getter or a setter function.
 				`)
 			}
-			const prop: PropertyDescriptor<any, any> | undefined = property_descriptors[key]
+			const prop: PropDescriptor<any, any> | undefined = property_descriptors[key]
 			if (!prop) continue
 			const accessors = make_accessors(target.name, key, prop, desc, spec)
 			Object.defineProperty(prototype, key, {

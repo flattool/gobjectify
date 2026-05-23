@@ -29,7 +29,7 @@ Here is an example:
 ```ts
 @GClass({ template: "resource:///org/example/my_widget.ui" })
 export class MyWidget extends from(Gtk.Box, {
-	title: Property.string(),
+	title: Property.readwrite.string(),
 	edited: Signal([String]),
 	refresh: SimpleAction(),
 	_button: Child<Gtk.Button>(),
@@ -91,7 +91,7 @@ import { from, GClass, Property, Child, WatchProp } from "./gobjectify/gobjectif
 
 @GClass({ template: "resource:///org/example/counter.ui" })
 export class Counter extends from(Gtk.Box, {
-	count: Property.uint32(),
+	count: Property.readwrite.uint32(),
 	_info_label: Child<Gtk.Label>(),
 	_increment: Child<Gtk.Button>(),
 	_decrement: Child<Gtk.Button>(),
