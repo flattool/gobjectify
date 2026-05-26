@@ -1,6 +1,6 @@
 {
   "name": "gobjectify",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "\"A type-safe, declarative TypeScript library for writing & interacting with GObject classes in GNOME JavaScript (GJS)\"",
   "main": "gobjectify.js",
   "scripts": {
