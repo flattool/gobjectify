@@ -80,7 +80,7 @@ type ResultingClass<
 	T extends AbstractGClassFor<GObject.Object>,
 	D extends Descriptor<D, InstanceType<T>>,
 	I extends AbstractGClassFor<GObject.Object>[],
-> = { $gtype: GObject.GType, $params: ResultingConstructorParamsObj<T, D>[0] } & (
+> = { $gtype: GObject.GType<InstanceType<T> & { readonly $unique: unique symbol }>, $params: ResultingConstructorParamsObj<T, D>[0] } & (
 	abstract new (...args: ResultingConstructorParamsObj<T, D>)=> (
 		SignalOverrides<InstanceType<T>, D>
 		& InstanceType<T>
