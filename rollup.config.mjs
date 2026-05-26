@@ -1,13 +1,14 @@
 import typescript from "@rollup/plugin-typescript"
 import dts from "rollup-plugin-dts"
+import pkg from "./package.json" with { type: "json" }
 
 const banner = `/*!
- * GObjectify 1.0.0 - A type-safe, declarative TypeScript library for writing & interacting with GObject classes in GNOME JavaScript (GJS)
+ * GObjectify ${pkg.version} - A type-safe, declarative TypeScript library for writing & interacting with GObject classes in GNOME JavaScript (GJS)
  * https://github.com/flattool/gobjectify
  *
  * MIT License
  *
- * Copyright (c) 2025 flattool
+ * Copyright (c) 2026 flattool
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
