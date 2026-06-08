@@ -43,23 +43,23 @@ type Finalize<D> = {
 
 type Descriptor<D, T extends GObject.Object> = {
 	[Key in keyof D as Key extends string
-		? Key
-		: never
+	? Key
+	: never
 	]: Key extends keyof T
-		? never
-		: (Key extends `_${string}`
-			? ChildDescriptor<GObject.Object>
-			: Key extends keyof T["$signals"]
-				? PropDescriptor<any, any>
-				: PropDescriptor<any, any> | SignalDescriptor<any[], any>
-		) | (T extends Gtk.Application | Gtk.ApplicationWindow | Gtk.Widget
-			? ActionDescriptor
-			: never
-		)
+	? never
+	: (Key extends `_${string}`
+		? ChildDescriptor<GObject.Object>
+		: Key extends keyof T["$signals"]
+		? PropDescriptor<any, any>
+		: PropDescriptor<any, any> | SignalDescriptor<any[], any>
+	) | (T extends Gtk.Application | Gtk.ApplicationWindow | Gtk.Widget
+		? ActionDescriptor
+		: never
+	)
 }
 
-type GClassFor<T extends GObject.Object> = new (...args: any[])=> T
-type AbstractGClassFor<T extends GObject.Object> = abstract new (...args: any[])=> T
+type GClassFor<T extends GObject.Object> = new (...args: any[]) => T
+type AbstractGClassFor<T extends GObject.Object> = abstract new (...args: any[]) => T
 
 type ValidConstructorProps<D> = {
 	[K in keyof ExtractConstructProps<D>]?: ExtractConstructProps<D>[K]
@@ -71,17 +71,17 @@ type ResultingConstructorParamsObj<
 > = ConstructorParameters<T> extends []
 	? [ValidConstructorProps<D>]
 	: ConstructorParameters<T> extends [(infer First)?, ...infer Rest]
-		? undefined extends ConstructorParameters<T>[0]
-			? [(ValidConstructorProps<D> & First)?, ...Rest]
-			: [(ValidConstructorProps<D> & First), ...Rest]
-		: never
+	? undefined extends ConstructorParameters<T>[0]
+	? [(ValidConstructorProps<D> & First)?, ...Rest]
+	: [(ValidConstructorProps<D> & First), ...Rest]
+	: never
 
 type ResultingClass<
 	T extends AbstractGClassFor<GObject.Object>,
 	D extends Descriptor<D, InstanceType<T>>,
 	I extends AbstractGClassFor<GObject.Object>[],
 > = { $gtype: GObject.GType<InstanceType<T> & { readonly $unique: unique symbol }>, $params: ResultingConstructorParamsObj<T, D>[0] } & (
-	abstract new (...args: ResultingConstructorParamsObj<T, D>)=> (
+	abstract new (...args: ResultingConstructorParamsObj<T, D>) => (
 		SignalOverrides<InstanceType<T>, D>
 		& InstanceType<T>
 		& ExtractWriteableProps<D>
@@ -103,14 +103,14 @@ type ClassDecoratorParams = {
 
 type WatchPropKeys<T extends GObject.Object> = {
 	[Key in keyof T]: Key extends string
-		? Key extends `_${string}`
-			? never
-			: Key extends "with_implements" | "$signals"
-				? never
-				: T[Key] extends Function
-					? never
-					: Key
-		: never
+	? Key extends `_${string}`
+	? never
+	: Key extends "with_implements" | "$signals"
+	? never
+	: T[Key] extends Function
+	? never
+	: Key
+	: never
 }[keyof T]
 
 const GOBJECTIFY_FROM_SYMBOL = Symbol("GOBJECTIFY_FROM_SYMBOL")
@@ -128,12 +128,12 @@ function is_base_metadata(item: any): item is BaseMetadata<any, GClassFor<GObjec
 	return item?.metadata_symbol === GOBJECTIFY_FROM_SYMBOL
 }
 
-type Instances<I extends (abstract new (...args: any)=> any)[]> = I extends [infer First, ...infer Rest]
-	? First extends abstract new (...args: any)=> any
-		? Rest extends (abstract new (...args: any)=> any)[]
-			? InstanceType<First> & Instances<Rest>
-			: InstanceType<First>
-		: never
+type Instances<I extends (abstract new (...args: any) => any)[]> = I extends [infer First, ...infer Rest]
+	? First extends abstract new (...args: any) => any
+	? Rest extends (abstract new (...args: any) => any)[]
+	? InstanceType<First> & Instances<Rest>
+	: InstanceType<First>
+	: never
 	: unknown
 
 /**
@@ -167,7 +167,7 @@ type Instances<I extends (abstract new (...args: any)=> any)[]> = I extends [inf
  * You would use it via: `constructor(params: typeof MyClassName.$params) { super(params) }`
  */
 function from<
-	T extends abstract new (...args: any[])=> GObject.Object,
+	T extends abstract new (...args: any[]) => GObject.Object,
 	D extends Descriptor<D, InstanceType<T>>,
 	I extends (AbstractGClassFor<GObject.Object> & { $gtype: GObject.GType })[],
 >(
@@ -175,7 +175,7 @@ function from<
 	descriptor: D,
 	...implement: I
 ): ResultingClass<T, D, I> {
-	abstract class Base extends extend {}
+	abstract class Base extends extend { }
 
 	(Base as any)[GOBJECTIFY_FROM_SYMBOL] = {
 		extend,
@@ -369,7 +369,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 
 			if (is_base_metadata(maybe_metadata) && actions.size > 0) {
 				let action_addable: Gio.SimpleActionGroup | Gtk.ApplicationWindow | Gtk.Application | undefined
-				let accel_setter: ((detailed_action_name: string, accels: string[])=> void) | undefined
+				let accel_setter: ((detailed_action_name: string, accels: string[]) => void) | undefined
 
 				if (this instanceof Gtk.ApplicationWindow) {
 					action_addable = this
@@ -391,8 +391,8 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				}
 			}
 
-			// makes "readonly" flagged properties throw when set after this point
-			// TODO: make computed properties throw when set before this point!
+			// makes "computed" properties throw when set before this point
+			// makes "readonly" properties throw when set after this point
 			this[INIT_FINISHED_SYMBOL] = true
 
 			return original_return_val
@@ -454,7 +454,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
  * - { trigger: "leading+trailing" }:
  * will call the function immediately, and call it once more after the interval has passed
  */
-function Debounce<T extends GObject.Object, U extends (this: T, ...args: any[])=> void>(
+function Debounce<T extends GObject.Object, U extends (this: T, ...args: any[]) => void>(
 	milliseconds: number,
 	params: { trigger: "leading" | "trailing" | "leading+trailing" } = { trigger: "trailing" },
 ) {
@@ -472,7 +472,7 @@ function Debounce<T extends GObject.Object, U extends (this: T, ...args: any[])=
 				original_method.apply(this, args)
 			} else {
 				(this as any)[last_args_symbol] = args
-				;(this as any)[should_call_trailing_symbol] = true
+					; (this as any)[should_call_trailing_symbol] = true
 			}
 			if ((this as any)[timeout_symbol]) {
 				GLib.source_remove((this as any)[timeout_symbol])
@@ -484,7 +484,7 @@ function Debounce<T extends GObject.Object, U extends (this: T, ...args: any[])=
 					(this as any)[timeout_symbol] = null
 					if (trailing && (this as any)[should_call_trailing_symbol]) {
 						original_method.apply(this, (this as any)[last_args_symbol] ?? [])
-						;(this as any)[should_call_trailing_symbol] = false
+							; (this as any)[should_call_trailing_symbol] = false
 					}
 					return GLib.SOURCE_REMOVE
 				},
@@ -532,9 +532,9 @@ function Debounce<T extends GObject.Object, U extends (this: T, ...args: any[])=
  * ```
  */
 function Notify<T extends GObject.Object, U>(
-	target: (this: T, arg0: U)=> void,
+	target: (this: T, arg0: U) => void,
 	context: ClassSetterDecoratorContext<T>,
-): (this: T, arg0: U)=> void {
+): (this: T, arg0: U) => void {
 	const field_name = String(context.name)
 	const canonical_name = field_name.replaceAll("_", "-")
 	return function (this: T, arg0: U): void {
@@ -580,7 +580,7 @@ function OnSignal<T extends GObject.Object, S extends keyof SignalsOf<T>>(
 		) => SignalsOf<T>[S] extends (...args: any) => infer Ret ? Ret : never,
 		context: ClassMethodDecoratorContext<T>,
 	): void => context.addInitializer(function (this: T): void {
-		this.connect(signal_name as string, target.bind(this))
+		this.connect(signal_name as string, (_self: T, ...args: any[]) => target.apply(this, args as any))
 	})
 }
 
@@ -597,15 +597,15 @@ function OnSimpleAction<
 	T extends GObject.Object,
 	K extends {
 		[Key in keyof T]: Key extends "with_implements"
-			? never
-			: T[Key] extends Gio.SimpleAction
-				? Key
-				: never
+		? never
+		: T[Key] extends Gio.SimpleAction
+		? Key
+		: never
 	}[keyof T],
 	U extends (
-		| ((this: T)=> any)
-		| ((this: T, action: Gio.SimpleAction)=> any)
-		| ((this: T, action: Gio.SimpleAction, value: GLib.Variant)=> any)
+		| ((this: T) => any)
+		| ((this: T, action: Gio.SimpleAction) => any)
+		| ((this: T, action: Gio.SimpleAction, value: GLib.Variant) => any)
 	),
 >(action_name: K) {
 	return function (target: U, context: ClassMethodDecoratorContext<T>): void {
@@ -685,7 +685,7 @@ const on_post_init_error = (method_name: string, class_name: string, e: unknown)
  * }
  * ```
  */
-function PostInit<T extends GObject.Object>(target: (this: T)=> any, context: ClassMethodDecoratorContext<T>): void {
+function PostInit<T extends GObject.Object>(target: (this: T) => any, context: ClassMethodDecoratorContext<T>): void {
 	context.addInitializer(function (this: T) {
 		next_idle().then(() => {
 			try {
