@@ -55,6 +55,7 @@ type SignalsOf<T extends GObject.Object> = {
 
 type SignalOverrides<T extends GObject.Object, D> = {
 	$connect<const Self extends GObject.Object, S extends keyof ExtractSignals<D> | keyof SignalsOf<T>>(
+		this: Self,
 		signal_name: S,
 		callback: SignalsOf<T>[S] extends (...args: infer Args) => infer Ret
 			? (self: Self, ...args: Args) => Ret
@@ -65,6 +66,7 @@ type SignalOverrides<T extends GObject.Object, D> = {
 				: never
 	): number,
 	$connect_after<const Self extends GObject.Object, S extends keyof ExtractSignals<D> | keyof SignalsOf<T>>(
+		this: Self,
 		signal_name: S,
 		callback: SignalsOf<T>[S] extends (...args: infer Args) => infer Ret
 			? (self: Self, ...args: Args) => Ret
