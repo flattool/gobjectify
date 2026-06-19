@@ -29,9 +29,12 @@ import {
 import {
 	type ActionDescriptor,
 	type ExtractActions,
-	SimpleAction,
+	type TypedActionBase,
+	type TypedActionParam,
+	type TypedActionState,
+	Action,
 	is_action_descriptor,
-} from "./simple_action.js"
+} from "./simple_action_two.js"
 import { ConstMap } from "./const_map.js"
 import GLib from "gi://GLib?version=2.0"
 
@@ -53,7 +56,7 @@ type Descriptor<D, T extends GObject.Object> = {
 		? PropDescriptor<any, any>
 		: PropDescriptor<any, any> | SignalDescriptor<any[], any>
 	) | (T extends Gtk.Application | Gtk.ApplicationWindow | Gtk.Widget
-		? ActionDescriptor
+		? ActionDescriptor<any, any>
 		: never
 	)
 }
@@ -286,7 +289,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 		const properties: Record<string, GObject.ParamSpec<any>> = {}
 		const property_descriptors: Record<string, PropDescriptor<any, any>> = {}
 		const children: string[] = []
-		const actions = new Map<string, ActionDescriptor>()
+		const actions = new Map<string, ActionDescriptor<any, any>>()
 		const signals: Record<string, RegisterableSignal> = {}
 		let implement: (AbstractGClassFor<GObject.Object> & { $gtype: GObject.GType })[] = []
 
@@ -383,10 +386,10 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 
 				if (action_addable !== undefined) {
 					for (const [name, value] of actions.entries()) {
-						const action = new Gio.SimpleAction({ name, ...value.args })
-						action_addable.add_action(action)
+						const typed_action = value.create(name)
+						action_addable.add_action(typed_action.action)
 						accel_setter?.(`app.${name}`, value.accels)
-						this[name] = action
+						this[name] = typed_action
 					}
 				}
 			}
@@ -888,6 +891,25 @@ GObject.Object.prototype.$connect_async = function (this: GObject.Object, resolv
 	})
 } as any
 
+// declare module "gi://Gtk?version=4.0" {
+// 	export namespace Gtk {
+// 		export interface Widget {
+// 			$activate_action<
+// 				C extends abstract new (...args: any[]) => Gtk.Widget,
+// 				N extends {
+// 					[K in keyof InstanceType<C>]: InstanceType<C>[K] extends TypedActionBase ? K : never
+// 				}[keyof InstanceType<C>]
+// 			>(
+// 				klass: C,
+// 				name: N,
+// 				...param: InstanceType<C>[N] extends TypedActionState<infer T> | TypedActionParam<infer T>
+// 					? [value: T]
+// 					: []
+// 			): void,
+// 		}
+// 	}
+// }
+
 export {
 	from,
 	next_idle,
@@ -904,5 +926,5 @@ export {
 	PostInit,
 	Property,
 	Child,
-	SimpleAction,
+	Action,
 }
