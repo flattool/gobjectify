@@ -5,17 +5,17 @@ const ACTION_SYMBOL = Symbol("Symbol for GObjectify SimpleAction descriptors")
 
 type ActionKind = "void" | "state" | "param"
 
-type HandleFormat<S extends string | undefined> = (S extends string
+type HandleActionFormat<S extends string | undefined> = (S extends string
 	? GLib.$ParseConstructorInput<S>
 	: undefined
 )
 
 interface ActionDescriptor<K extends ActionKind, S extends (K extends "void" ? undefined : string)> {
-	kind: K
-	format: S
-	initial_state: HandleFormat<S>
-	accels: string[]
-	action_symbol: typeof ACTION_SYMBOL
+	readonly kind: K
+	readonly format: S
+	readonly initial_state: HandleActionFormat<S>
+	readonly accels: string[]
+	readonly action_symbol: typeof ACTION_SYMBOL
 	create(name: string): TypedAction<K, S>
 }
 
@@ -27,20 +27,29 @@ type TypedAction<K extends ActionKind, S extends (K extends "void" ? undefined :
 	activate(): void,
 	connect(callback: (self: TypedAction<K, S>) => void): number,
 } : K extends "param" ? {
-	activate(param: HandleFormat<S>): void,
-	connect(callback: (self: TypedAction<K, S>, param: HandleFormat<S>) => void): number,
+	activate(param: HandleActionFormat<S>): void,
+	connect(callback: (self: TypedAction<K, S>, param: HandleActionFormat<S>) => void): number,
 } : K extends "state" ? {
-	activate(new_state: HandleFormat<S>): void,
-	connect(callback: (self: TypedAction<K, S>, new_state: HandleFormat<S>) => void): number,
-	state: HandleFormat<S>,
+	activate(new_state: HandleActionFormat<S>): void,
+	connect(callback: (self: TypedAction<K, S>, new_state: HandleActionFormat<S>) => void): number,
+	state: HandleActionFormat<S>,
 } : never)
+
+type ExtractActions<D> = {
+	readonly [Key in keyof D as D[Key] extends ActionDescriptor<any, any>
+	? Key
+	: never
+	]: D[Key] extends ActionDescriptor<infer K, infer S>
+	? TypedAction<K, S>
+	: never
+}
 
 type ActionConfig = { accels: string[] }
 
 const make_param = <const S extends string>(format: S, config?: ActionConfig): ActionDescriptor<"param", S> => ({
 	kind: "param",
 	format,
-	initial_state: undefined as HandleFormat<S>,
+	initial_state: undefined as HandleActionFormat<S>,
 	accels: config?.accels ?? [],
 	action_symbol: ACTION_SYMBOL,
 	create(name: string): TypedAction<"param", S> {
@@ -50,16 +59,20 @@ const make_param = <const S extends string>(format: S, config?: ActionConfig): A
 			disconnect: (id: number) => action.disconnect(id),
 			get enabled() { return action.get_enabled() },
 			set enabled(v) { action.set_enabled(v) },
-			activate: (param: HandleFormat<S>) => action.activate(new GLib.Variant(format, param as any)),
-			connect: (callback: (self: TypedAction<"param", S>, param: HandleFormat<S>) => void) => (
-				action.$connect("activate", (_self, variant) => callback(instance, variant!.unpack() as HandleFormat<S>))
+			activate: (param: HandleActionFormat<S>) => action.activate(new GLib.Variant(format, param as any)),
+			connect: (callback: (self: TypedAction<"param", S>, param: HandleActionFormat<S>) => void) => (
+				action.$connect("activate", (_self, variant) => callback(instance, variant!.unpack() as HandleActionFormat<S>))
 			),
 		})
 		return instance
 	},
 })
 
-const make_state = <const S extends string>(format: S, initial_state: HandleFormat<S>, config?: ActionConfig): ActionDescriptor<"state", S> => ({
+const make_state = <const S extends string>(
+	format: S,
+	initial_state: HandleActionFormat<S>,
+	config?: ActionConfig,
+): ActionDescriptor<"state", S> => ({
 	kind: "state",
 	format,
 	initial_state,
@@ -72,11 +85,11 @@ const make_state = <const S extends string>(format: S, initial_state: HandleForm
 			disconnect: (id: number) => action.disconnect(id),
 			get enabled() { return action.get_enabled() },
 			set enabled(v) { action.set_enabled(v) },
-			get state() { return action.get_state()!.unpack() as HandleFormat<S> },
+			get state() { return action.get_state()!.unpack() as HandleActionFormat<S> },
 			set state(v) { action.set_state(new GLib.Variant(format, v as any)) },
-			activate: (new_state: HandleFormat<S>) => action.activate(new GLib.Variant(format, new_state as any)),
-			connect: (callback: (self: TypedAction<"state", S>, new_state: HandleFormat<S>) => void) => (
-				action.$connect("activate", (_self, variant) => callback(instance, variant!.unpack() as HandleFormat<S>))
+			activate: (new_state: HandleActionFormat<S>) => action.activate(new GLib.Variant(format, new_state as any)),
+			connect: (callback: (self: TypedAction<"state", S>, new_state: HandleActionFormat<S>) => void) => (
+				action.$connect("activate", (_self, variant) => callback(instance, variant!.unpack() as HandleActionFormat<S>))
 			),
 		})
 		return instance
@@ -111,8 +124,10 @@ const Action = {
 		int32: (config?: ActionConfig) => make_param("i", config),
 		uint32: (config?: ActionConfig) => make_param("u", config),
 		double: (config?: ActionConfig) => make_param("d", config),
-		// TODO: Do this for `state` as well
-		variant: <const F extends string>(format: F, config?: ActionConfig): ActionDescriptor<"param", F> => make_param(format, config),
+		variant: <const F extends string>(
+			format: F,
+			config?: ActionConfig,
+		): ActionDescriptor<"param", F> => make_param(format, config),
 	},
 	state: {
 		string: <const T extends string>(initial_state: T, config?: ActionConfig) => make_state("s", initial_state, config),
@@ -120,6 +135,15 @@ const Action = {
 		int32: <const T extends number>(initial_state: T, config?: ActionConfig) => make_state("i", initial_state, config),
 		uint32: <const T extends number>(initial_state: T, config?: ActionConfig) => make_state("u", initial_state, config),
 		double: <const T extends number>(initial_state: T, config?: ActionConfig) => make_state("d", initial_state, config),
-	}
-	// variant()
+		variant: <const F extends string>(
+			format: F,
+			initial_state: HandleActionFormat<F>,
+			config?: ActionConfig,
+		): ActionDescriptor<"state", F> => make_state(format, initial_state, config),
+	},
 } as const
+
+const is_action_descriptor = (item: any): item is ActionDescriptor<any, any> => item?.action_symbol === ACTION_SYMBOL
+
+export { Action, is_action_descriptor }
+export type { ActionDescriptor, TypedAction, ExtractActions, HandleActionFormat }

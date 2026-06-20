@@ -29,12 +29,11 @@ import {
 import {
 	type ActionDescriptor,
 	type ExtractActions,
-	type TypedActionBase,
-	type TypedActionParam,
-	type TypedActionState,
+	type TypedAction,
+	type HandleActionFormat,
 	Action,
 	is_action_descriptor,
-} from "./simple_action_two.js"
+} from "./simple_action_three.js"
 import { ConstMap } from "./const_map.js"
 import GLib from "gi://GLib?version=2.0"
 
@@ -90,7 +89,7 @@ type ResultingClass<
 		& ExtractWriteableProps<D>
 		& ExtractReadonlyProps<D>
 		& Finalize<ExtractChildren<D>>
-		& Finalize<ExtractActions<D>>
+		& ExtractActions<D>
 		& Finalize<{ with_implements: I extends [] ? never : Instances<I> }>
 	)
 )
@@ -587,6 +586,35 @@ function OnSignal<T extends GObject.Object, S extends keyof SignalsOf<T>>(
 	})
 }
 
+function OnSimpleAction<
+	T extends Gtk.Widget,
+	K extends {
+		[Key in keyof T]: Key extends "with_implements"
+		? never
+		: T[Key] extends Gio.SimpleAction | TypedAction<any, any>
+		? Key
+		: never
+	}[keyof T],
+	U extends T[K] extends Gio.SimpleAction
+		? (this: T, variant: GLib.Variant) => any
+		: T[K] extends TypedAction<infer Kind, infer S>
+			? Kind extends "param" | "state"
+				? (this: T, param_state: HandleActionFormat<S>) => any
+				: (this: T) => any
+			: never
+>(action_name: K) {
+	return function (target: U, context: ClassMethodDecoratorContext<T>): void {
+		context.addInitializer(function (this: T): void {
+			const action = this[action_name] as Gio.SimpleAction | TypedAction<any, any>
+			if (action instanceof Gio.SimpleAction) {
+				action.connect("activate", target.bind(this))
+			} else {
+				action.connect(target.bind(this) as any)
+			}
+		})
+	}
+}
+
 /**
  * Decorator that connects a method to a Gio simple action's event signal.
  *
@@ -596,27 +624,27 @@ function OnSignal<T extends GObject.Object, S extends keyof SignalsOf<T>>(
  *
  * @param action_name - Name of the field containing a GioSimpleAction to connect to.
  */
-function OnSimpleAction<
-	T extends GObject.Object,
-	K extends {
-		[Key in keyof T]: Key extends "with_implements"
-		? never
-		: T[Key] extends Gio.SimpleAction
-		? Key
-		: never
-	}[keyof T],
-	U extends (
-		| ((this: T) => any)
-		| ((this: T, action: Gio.SimpleAction) => any)
-		| ((this: T, action: Gio.SimpleAction, value: GLib.Variant) => any)
-	),
->(action_name: K) {
-	return function (target: U, context: ClassMethodDecoratorContext<T>): void {
-		context.addInitializer(function (this: T): void {
-			(this[action_name] as Gio.SimpleAction).connect("activate", target.bind(this))
-		})
-	}
-}
+// function OnSimpleAction<
+// 	T extends GObject.Object,
+// 	K extends {
+// 		[Key in keyof T]: Key extends "with_implements"
+// 		? never
+// 		: T[Key] extends Gio.SimpleAction
+// 		? Key
+// 		: never
+// 	}[keyof T],
+// 	U extends (
+// 		| ((this: T) => any)
+// 		| ((this: T, action: Gio.SimpleAction) => any)
+// 		| ((this: T, action: Gio.SimpleAction, value: GLib.Variant) => any)
+// 	),
+// >(action_name: K) {
+// 	return function (target: U, context: ClassMethodDecoratorContext<T>): void {
+// 		context.addInitializer(function (this: T): void {
+// 			(this[action_name] as Gio.SimpleAction).connect("activate", target.bind(this))
+// 		})
+// 	}
+// }
 
 /**
  * Decorator that connects a method to one or more GObject property change notifications.
