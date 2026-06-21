@@ -367,7 +367,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 			properties[name] = spec
 		}
 
-		// runs when an instance is create, thanks GTK for having an init hook
+		// runs when an instance is created, thanks GTK for having an init hook
 		// -------------------------------------------------------------------
 		const original_init = prototype._init
 		prototype._init = function (...args: any): any {
@@ -376,9 +376,15 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 			if (is_base_metadata(maybe_metadata) && actions.size > 0) {
 				let action_addable: Gio.SimpleActionGroup | Gtk.ApplicationWindow | Gtk.Application | undefined
 				let accel_setter: ((detailed_action_name: string, accels: string[]) => void) | undefined
+				const action_prefix = resolve_action_prefix(target)
 
+				// TODO: Document how accels get set for GtkApplicationWindows, particularly the next_idle part
 				if (this instanceof Gtk.ApplicationWindow) {
 					action_addable = this
+					accel_setter = (detailed_name, accels) => {
+						if (accels.length < 1) return
+						next_idle().then(() => this.get_application()?.set_accels_for_action(detailed_name, accels))
+					}
 				} else if (this instanceof Gtk.Application) {
 					action_addable = this
 					accel_setter = this.set_accels_for_action.bind(this)
@@ -391,7 +397,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 					for (const [name, value] of actions.entries()) {
 						const typed_action = value.create(name)
 						action_addable.add_action(typed_action.action)
-						accel_setter?.(`app.${name}`, value.accels)
+						accel_setter?.(`${action_prefix}.${name}`, value.accels)
 						this[name] = typed_action
 					}
 				}
