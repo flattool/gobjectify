@@ -146,4 +146,4 @@ const Action = {
 const is_action_descriptor = (item: any): item is ActionDescriptor<any, any> => item?.action_symbol === ACTION_SYMBOL
 
 export { Action, is_action_descriptor }
-export type { ActionDescriptor, TypedAction, ExtractActions, HandleActionFormat }
+export type { ActionKind, ActionDescriptor, TypedAction, ExtractActions, HandleActionFormat }
