@@ -76,7 +76,8 @@ type ExtractActionDescriptors<D> = {
 	: never
 }
 
-type ActionConfig = { accels: string[] }
+type ActionConfig = { accels?: string[] }
+type StateActionConfig<T> = ActionConfig & { default?: T }
 
 function resolve_action_prefix(klass: abstract new (...args: any[]) => any): string {
 	if (klass.prototype instanceof Gtk.ApplicationWindow) return "win"
@@ -139,6 +140,31 @@ const make_state = <const S extends string, const Default extends HandleActionFo
 	as(): any { return this },
 })
 
+const param = {
+	string: (config?: ActionConfig) => make_param("s", config),
+	bool: (config?: ActionConfig) => make_param("b", config),
+	int32: (config?: ActionConfig) => make_param("i", config),
+	uint32: (config?: ActionConfig) => make_param("u", config),
+	double: (config?: ActionConfig) => make_param("d", config),
+	variant: <const S extends string>(
+		format: S,
+		config?: ActionConfig,
+	): Omit<ActionDescriptor<"param", S>, "as"> => make_param(format, config),
+}
+
+const state = {
+	string: <const D extends string>(config?: StateActionConfig<D>) => make_state("s", (config?.default ?? "" as D), config),
+	bool: <const D extends boolean>(config?: StateActionConfig<D>) => make_state("b", (config?.default ?? false as D), config),
+	int32: <const D extends number>(config?: StateActionConfig<D>) => make_state("i", (config?.default ?? 0 as D), config),
+	uint32: <const D extends number>(config?: StateActionConfig<D>) => make_state("u", (config?.default ?? 0 as D), config),
+	double: <const D extends number>(config?: StateActionConfig<D>) => make_state("d", (config?.default ?? 0 as D), config),
+	variant: <const S extends string, const T extends HandleActionFormat<S>>(
+		format: S,
+		default_state: T,
+		config?: ActionConfig,
+	): Omit<ActionDescriptor<"state", S, HandleActionFormat<S>, T>, "as"> => make_state(format, default_state, config),
+} as const
+
 const Action = {
 	void: (config?: ActionConfig): ActionDescriptor<"void", undefined> => ({
 		kind: "void",
@@ -159,29 +185,8 @@ const Action = {
 			return instance
 		},
 	}),
-	param: {
-		string: (config?: ActionConfig) => make_param("s", config),
-		bool: (config?: ActionConfig) => make_param("b", config),
-		int32: (config?: ActionConfig) => make_param("i", config),
-		uint32: (config?: ActionConfig) => make_param("u", config),
-		double: (config?: ActionConfig) => make_param("d", config),
-		variant: <const S extends string>(
-			format: S,
-			config?: ActionConfig,
-		): Omit<ActionDescriptor<"param", S>, "as"> => make_param(format, config),
-	},
-	state: {
-		string: <const T extends string>(initial_state: T, config?: ActionConfig) => make_state("s", initial_state, config),
-		bool: <const T extends boolean>(initial_state: T, config?: ActionConfig) => make_state("b", initial_state, config),
-		int32: <const T extends number>(initial_state: T, config?: ActionConfig) => make_state("i", initial_state, config),
-		uint32: <const T extends number>(initial_state: T, config?: ActionConfig) => make_state("u", initial_state, config),
-		double: <const T extends number>(initial_state: T, config?: ActionConfig) => make_state("d", initial_state, config),
-		variant: <const S extends string, const T extends HandleActionFormat<S>>(
-			format: S,
-			initial_state: T,
-			config?: ActionConfig,
-		): Omit<ActionDescriptor<"state", S, HandleActionFormat<S>, T>, "as"> => make_state(format, initial_state, config),
-	},
+	param,
+	state,
 } as const
 
 const is_action_descriptor = (item: any): item is ActionDescriptor<any, any> => item?.action_symbol === ACTION_SYMBOL
