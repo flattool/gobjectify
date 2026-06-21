@@ -10,90 +10,115 @@ type HandleActionFormat<S extends string | undefined> = (S extends string
 	: undefined
 )
 
-interface ActionDescriptor<K extends ActionKind, S extends (K extends "void" ? undefined : string)> {
-	readonly kind: K
-	readonly format: S
-	readonly initial_state: HandleActionFormat<S>
-	readonly accels: string[]
-	readonly action_symbol: typeof ACTION_SYMBOL
-	create(name: string): TypedAction<K, S>
-}
+type ActionNarrowable<
+	K extends ActionKind,
+	S extends (K extends "void" ? undefined : string),
+	T,
+	Default extends T,
+> = (K extends "void" ? {} : K extends "param" ? {
+	as<Narrow extends T>(): ActionDescriptor<K, S, Narrow, Narrow>
+} : K extends "state" ? {
+	as<Narrow extends T>(): Default extends Narrow ? ActionDescriptor<K, S, Narrow, Default> : [never] & void
+} : never)
 
-type TypedAction<K extends ActionKind, S extends (K extends "void" ? undefined : string)> = ActionDescriptor<K, S> & {
+type ActionDescriptor<
+	K extends ActionKind,
+	S extends (K extends "void" ? undefined : string),
+	T = HandleActionFormat<S>,
+	Default extends T = T,
+> = {
+	readonly kind: K,
+	readonly format: S,
+	readonly initial_state: K extends "state" ? Default : undefined,
+	readonly accels: string[],
+	readonly action_symbol: typeof ACTION_SYMBOL,
+	create(name: string): TypedAction<K, S, T>,
+} & ActionNarrowable<K, S, T, Default>
+
+type TypedAction<
+	K extends ActionKind,
+	S extends (K extends "void" ? undefined : string),
+	T = HandleActionFormat<S>,
+> = ActionDescriptor<K, S, T> & {
 	readonly action: Gio.SimpleAction,
 	disconnect(id: number): void,
 	enabled: boolean,
 } & (K extends "void" ? {
 	activate(): void,
-	connect(callback: (self: TypedAction<K, S>) => void): number,
+	connect(callback: (self: TypedAction<K, S, T>) => void): number,
 } : K extends "param" ? {
-	activate(param: HandleActionFormat<S>): void,
-	connect(callback: (self: TypedAction<K, S>, param: HandleActionFormat<S>) => void): number,
+	activate(param: T): void,
+	connect(callback: (self: TypedAction<K, S, T>, param: T) => void): number,
 } : K extends "state" ? {
-	activate(new_state: HandleActionFormat<S>): void,
-	connect(callback: (self: TypedAction<K, S>, new_state: HandleActionFormat<S>) => void): number,
-	state: HandleActionFormat<S>,
+	activate(new_state: T): void,
+	connect(callback: (self: TypedAction<K, S, T>, new_state: T) => void): number,
+	state: T,
 } : never)
 
 type ExtractActions<D> = {
-	readonly [Key in keyof D as D[Key] extends ActionDescriptor<any, any>
+	readonly [Key in keyof D as D[Key] extends ActionDescriptor<any, any, any, any>
 	? Key
 	: never
-	]: D[Key] extends ActionDescriptor<infer K, infer S>
-	? TypedAction<K, S>
+	]: D[Key] extends ActionDescriptor<infer K, infer S, infer T, any>
+	? TypedAction<K, S, T>
 	: never
 }
 
 type ActionConfig = { accels: string[] }
 
-const make_param = <const S extends string>(format: S, config?: ActionConfig): ActionDescriptor<"param", S> => ({
+const make_param = <const S extends string>(
+	format: S,
+	config?: ActionConfig,
+): ActionDescriptor<"param", S, HandleActionFormat<S>, never> => ({
 	kind: "param",
 	format,
-	initial_state: undefined as HandleActionFormat<S>,
+	initial_state: undefined as any,
 	accels: config?.accels ?? [],
 	action_symbol: ACTION_SYMBOL,
-	create(name: string): TypedAction<"param", S> {
+	create(name: string) {
 		const action = new Gio.SimpleAction({ name, parameter_type: new GLib.VariantType(format) })
-		const instance: TypedAction<"param", S> = Object.assign(Object.create(this), {
+		const instance = Object.assign(Object.create(this), {
 			action,
 			disconnect: (id: number) => action.disconnect(id),
 			get enabled() { return action.get_enabled() },
 			set enabled(v) { action.set_enabled(v) },
-			activate: (param: HandleActionFormat<S>) => action.activate(new GLib.Variant(format, param as any)),
-			connect: (callback: (self: TypedAction<"param", S>, param: HandleActionFormat<S>) => void) => (
-				action.$connect("activate", (_self, variant) => callback(instance, variant!.unpack() as HandleActionFormat<S>))
+			activate: (param: any) => action.activate(new GLib.Variant(format, param)),
+			connect: (callback: any) => (
+				action.$connect("activate", (_self, variant) => callback(instance, variant!.unpack()))
 			),
 		})
 		return instance
 	},
+	as(): any { return this },
 })
 
-const make_state = <const S extends string>(
+const make_state = <const S extends string, const Default extends HandleActionFormat<S>>(
 	format: S,
-	initial_state: HandleActionFormat<S>,
+	initial_state: Default,
 	config?: ActionConfig,
-): ActionDescriptor<"state", S> => ({
+): ActionDescriptor<"state", S, HandleActionFormat<S>, Default> => ({
 	kind: "state",
 	format,
 	initial_state,
 	accels: config?.accels ?? [],
 	action_symbol: ACTION_SYMBOL,
-	create(name: string): TypedAction<"state", S> {
+	create(name: string) {
 		const action = new Gio.SimpleAction({ name, state: new GLib.Variant(format, initial_state as any) })
-		const instance: TypedAction<"state", S> = Object.assign(Object.create(this), {
+		const instance = Object.assign(Object.create(this), {
 			action,
 			disconnect: (id: number) => action.disconnect(id),
 			get enabled() { return action.get_enabled() },
 			set enabled(v) { action.set_enabled(v) },
-			get state() { return action.get_state()!.unpack() as HandleActionFormat<S> },
+			get state() { return action.get_state()!.unpack() },
 			set state(v) { action.set_state(new GLib.Variant(format, v as any)) },
-			activate: (new_state: HandleActionFormat<S>) => action.activate(new GLib.Variant(format, new_state as any)),
-			connect: (callback: (self: TypedAction<"state", S>, new_state: HandleActionFormat<S>) => void) => (
-				action.$connect("activate", (_self, variant) => callback(instance, variant!.unpack() as HandleActionFormat<S>))
+			activate: (new_state: any) => action.activate(new GLib.Variant(format, new_state)),
+			connect: (callback: any) => (
+				action.$connect("activate", (_self, variant) => callback(instance, variant!.unpack()))
 			),
 		})
 		return instance
 	},
+	as(): any { return this },
 })
 
 const Action = {
@@ -103,17 +128,15 @@ const Action = {
 		initial_state: undefined,
 		accels: config?.accels ?? [],
 		action_symbol: ACTION_SYMBOL,
-		create(name: string): TypedAction<"void", undefined> {
+		create(name: string) {
 			const action = new Gio.SimpleAction({ name })
-			const instance: TypedAction<"void", undefined> = Object.assign(Object.create(this), {
+			const instance = Object.assign(Object.create(this), {
 				action,
 				disconnect: (id: number) => action.disconnect(id),
 				get enabled() { return action.get_enabled() },
 				set enabled(v) { action.set_enabled(v) },
 				activate: () => action.activate(null),
-				connect: (callback: (self: TypedAction<"void", undefined>) => void) => (
-					action.$connect("activate", () => callback(instance))
-				),
+				connect: (callback: any) => action.$connect("activate", () => callback(instance)),
 			})
 			return instance
 		},
@@ -124,10 +147,10 @@ const Action = {
 		int32: (config?: ActionConfig) => make_param("i", config),
 		uint32: (config?: ActionConfig) => make_param("u", config),
 		double: (config?: ActionConfig) => make_param("d", config),
-		variant: <const F extends string>(
-			format: F,
+		variant: <const S extends string>(
+			format: S,
 			config?: ActionConfig,
-		): ActionDescriptor<"param", F> => make_param(format, config),
+		): Omit<ActionDescriptor<"param", S>, "as"> => make_param(format, config),
 	},
 	state: {
 		string: <const T extends string>(initial_state: T, config?: ActionConfig) => make_state("s", initial_state, config),
@@ -135,11 +158,11 @@ const Action = {
 		int32: <const T extends number>(initial_state: T, config?: ActionConfig) => make_state("i", initial_state, config),
 		uint32: <const T extends number>(initial_state: T, config?: ActionConfig) => make_state("u", initial_state, config),
 		double: <const T extends number>(initial_state: T, config?: ActionConfig) => make_state("d", initial_state, config),
-		variant: <const F extends string>(
-			format: F,
-			initial_state: HandleActionFormat<F>,
+		variant: <const S extends string, const T extends HandleActionFormat<S>>(
+			format: S,
+			initial_state: T,
 			config?: ActionConfig,
-		): ActionDescriptor<"state", F> => make_state(format, initial_state, config),
+		): Omit<ActionDescriptor<"state", S, HandleActionFormat<S>, T>, "as"> => make_state(format, initial_state, config),
 	},
 } as const
 

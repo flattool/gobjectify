@@ -9,15 +9,21 @@ type WidgetClass = abstract new (...args: any[]) => Gtk.Widget
 type ActionsOf<G extends WidgetClass, Kinds extends ActionKind = ActionKind> = {
 	[Key in keyof InstanceType<G> as Key extends "with_implements"
 	? never
-	: InstanceType<G>[Key] extends TypedAction<infer Kind, any>
+	: InstanceType<G>[Key] extends TypedAction<infer Kind, any, any>
 	? Kind extends Kinds
 	? Key
 	: never
 	: never
-	]: InstanceType<G>[Key] extends TypedAction<any, any>
+	]: InstanceType<G>[Key] extends TypedAction<any, any, any>
 	? InstanceType<G>[Key]
 	: never
 }
+type ParamStateTypeOf<D extends ActionDescriptor<any, any, any, any>> = (
+	D extends ActionDescriptor<any, any, infer T, any> ? T : never
+)
+type KindOf<D extends ActionDescriptor<any, any, any, any>> = (
+	D extends ActionDescriptor<infer Kind, any, any, any> ? Kind : never
+)
 
 type MenuItemConfig = {
 	label: string | null,
@@ -61,7 +67,7 @@ function item<
 >(
 	klass: G,
 	key: K,
-	config: MenuItemInput<HandleActionFormat<ActionsOf<G>[K]["format"]>, ActionsOf<G>[K]["kind"]>
+	config: MenuItemInput<ParamStateTypeOf<ActionsOf<G>[K]>, KindOf<ActionsOf<G>[K]>>
 ): Gio.MenuItem {
 	const descriptor: ActionDescriptor<any, any> = (klass as any).$action_descriptors[key]
 	const detailed_action = `${klass.name}.${String(key)}`
@@ -78,7 +84,7 @@ function item_group<
 >(
 	klass: G,
 	key: K,
-	...configs: GroupedItemInput<HandleActionFormat<ActionsOf<G, "state">[K]["format"]>>
+	...configs: GroupedItemInput<ParamStateTypeOf<ActionsOf<G, "state">[K]>>
 ): Gio.MenuItem[] {
 	const descriptor: ActionDescriptor<any, any> = (klass as any).$action_descriptors[key]
 	const detailed_action = `${klass.name}.${String(key)}`
@@ -88,10 +94,9 @@ function item_group<
 type ItemsForInput<G extends WidgetClass> = {
 	[Key in keyof ActionsOf<G>]?: (ActionsOf<G>[Key]["kind"] extends "state"
 		? (
-			| MenuItemInput<HandleActionFormat<ActionsOf<G>[Key]["format"]>, "state">
-			| GroupedItemInput<HandleActionFormat<ActionsOf<G>[Key]["format"]>>
-		)
-		: MenuItemInput<HandleActionFormat<ActionsOf<G>[Key]["format"]>, ActionsOf<G>[Key]["kind"]>
+			| MenuItemInput<ParamStateTypeOf<ActionsOf<G>[Key]>, "state">
+			| GroupedItemInput<ParamStateTypeOf<ActionsOf<G>[Key]>>
+		) : MenuItemInput<ParamStateTypeOf<ActionsOf<G>[Key]>, KindOf<ActionsOf<G>[Key]>>
 	)
 }
 
@@ -155,24 +160,11 @@ export const Menu = {
 import { Action, from } from "./gobjectify.js"
 
 class Test extends from(Gtk.Box, {
-	act: Action.state.bool(true),
-	bye: Action.param.string(),
-	non: Action.void(),
+	bye: Action.state.string("one").as<"one" | "two">(),
 }) {
+	fn(): void {
+		this.bye.activate("two")
+	}
 }
 
-Menu.build(
-	Menu.items_for(Test, {
-		non: "Hi",
-		act: [
-			{ label: "False", target: false },
-			{ label: "True", target: true },
-		],
-	}),
-	Menu.item(Test, "bye", { label: "Bye", target: "go away" }),
-	Menu.submenu(
-		"More",
-		Menu.item_group(Test, "act", { label: "True", target: true }, { label: "False", target: false }),
-	),
-	new Gio.MenuItem(),
-)
+Menu.build(Menu.item_group(Test, "bye", { label: "", target: "one" }, { label: "", target: "two" }))

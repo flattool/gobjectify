@@ -30,7 +30,6 @@ import {
 	type ActionDescriptor,
 	type ExtractActions,
 	type TypedAction,
-	type HandleActionFormat,
 	Action,
 	is_action_descriptor,
 } from "./simple_action_three.js"
@@ -55,7 +54,7 @@ type Descriptor<D, T extends GObject.Object> = {
 		? PropDescriptor<any, any>
 		: PropDescriptor<any, any> | SignalDescriptor<any[], any>
 	) | (T extends Gtk.Application | Gtk.ApplicationWindow | Gtk.Widget
-		? ActionDescriptor<any, any>
+		? ActionDescriptor<any, any, any, any>
 		: never
 	)
 }
@@ -288,7 +287,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 		const properties: Record<string, GObject.ParamSpec<any>> = {}
 		const property_descriptors: Record<string, PropDescriptor<any, any>> = {}
 		const children: string[] = []
-		const actions = new Map<string, ActionDescriptor<any, any>>()
+		const actions = new Map<string, ActionDescriptor<any, any, any, any>>()
 		const signals: Record<string, RegisterableSignal> = {}
 		let implement: (AbstractGClassFor<GObject.Object> & { $gtype: GObject.GType })[] = []
 
@@ -591,17 +590,17 @@ function OnSimpleAction<
 	K extends {
 		[Key in keyof T]: Key extends "with_implements"
 		? never
-		: T[Key] extends Gio.SimpleAction | TypedAction<any, any>
+		: T[Key] extends Gio.SimpleAction | TypedAction<any, any, any>
 		? Key
 		: never
 	}[keyof T],
 	U extends T[K] extends Gio.SimpleAction
-		? (this: T, variant: GLib.Variant) => any
-		: T[K] extends TypedAction<infer Kind, infer S>
-			? Kind extends "param" | "state"
-				? (this: T, param_state: HandleActionFormat<S>) => any
-				: (this: T) => any
-			: never
+	? (this: T, variant: GLib.Variant) => any
+	: T[K] extends TypedAction<infer Kind, any, infer N>
+	? Kind extends "param" | "state"
+	? (this: T, param_state: N) => any
+	: (this: T) => any
+	: never
 >(action_name: K) {
 	return function (target: U, context: ClassMethodDecoratorContext<T>): void {
 		context.addInitializer(function (this: T): void {
