@@ -1,5 +1,6 @@
-import Gio from "gi://Gio?version=2.0"
 import GLib from "gi://GLib?version=2.0"
+import Gio from "gi://Gio?version=2.0"
+import Gtk from "gi://Gtk?version=4.0"
 
 // TODO: Document all of this!
 
@@ -76,6 +77,12 @@ type ExtractActionDescriptors<D> = {
 }
 
 type ActionConfig = { accels: string[] }
+
+function resolve_action_prefix(klass: abstract new (...args: any[]) => any): string {
+	if (klass.prototype instanceof Gtk.ApplicationWindow) return "win"
+	if (klass.prototype instanceof Gtk.Application) return "app"
+	return klass.name
+}
 
 const make_param = <const S extends string>(
 	format: S,
@@ -179,5 +186,5 @@ const Action = {
 
 const is_action_descriptor = (item: any): item is ActionDescriptor<any, any> => item?.action_symbol === ACTION_SYMBOL
 
-export { Action, is_action_descriptor }
+export { Action, is_action_descriptor, resolve_action_prefix }
 export type { ActionKind, ActionDescriptor, TypedAction, ExtractActions, ExtractActionDescriptors, HandleActionFormat }

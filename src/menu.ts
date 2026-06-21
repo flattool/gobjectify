@@ -3,9 +3,9 @@ import Gio from "gi://Gio?version=2.0"
 import Gtk from "gi://Gtk?version=4.0"
 
 import type { TypedAction, ActionKind, ActionDescriptor } from "./simple_action_three.js"
+import { resolve_action_prefix } from "./simple_action_three.js"
 
 // TODO: Use $action_descriptors as source of truth for actions instead of ActionsOf
-// TODO: Fix incorrect action prefixes for GtkApplication and GtkApplicationWindow classes
 
 type WidgetClass = (
 	abstract new (...args: any[]) => Gtk.Widget
@@ -77,7 +77,7 @@ function item<
 	config: MenuItemInput<ParamStateTypeOf<ActionsOf<G>[K]>, KindOf<ActionsOf<G>[K]>>
 ): Gio.MenuItem {
 	const descriptor: ActionDescriptor<any, any> = (klass as any).$action_descriptors[key]
-	const detailed_action = `${klass.name}.${String(key)}`
+	const detailed_action = `${resolve_action_prefix(klass)}.${String(key)}`
 	return initialize_menu_item(
 		detailed_action,
 		typeof config === "string" ? { label: config } : config,
@@ -94,7 +94,7 @@ function item_group<
 	...configs: GroupedItemInput<ParamStateTypeOf<ActionsOf<G, "state">[K]>>
 ): Gio.MenuItem[] {
 	const descriptor: ActionDescriptor<any, any> = (klass as any).$action_descriptors[key]
-	const detailed_action = `${klass.name}.${String(key)}`
+	const detailed_action = `${resolve_action_prefix(klass)}.${String(key)}`
 	return configs.map((config) => initialize_menu_item(detailed_action, config, descriptor.format))
 }
 
@@ -161,17 +161,3 @@ export const Menu = {
 	item_group,
 	items_for,
 } as const
-
-// ::: ===[ TEST ]=== :::
-
-import { Action, from } from "./gobjectify.js"
-
-class Test extends from(Gtk.Box, {
-	bye: Action.state.string("one").as<"one" | "two">(),
-}) {
-	fn(): void {
-		this.bye.activate("two")
-	}
-}
-
-Menu.build(Menu.item_group(Test, "bye", { label: "", target: "one" }, { label: "", target: "two" }))

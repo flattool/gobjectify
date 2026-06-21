@@ -21,17 +21,18 @@ import {
 	type SignalDescriptor,
 	type SignalOverrides,
 	type RegisterableSignal,
-	Signal,
-	is_signal_descriptor,
 	type SignalsOf,
+	is_signal_descriptor,
+	Signal,
 } from "./signal.js"
 import {
 	type ActionDescriptor,
 	type ExtractActions,
 	type ExtractActionDescriptors,
 	type TypedAction,
-	Action,
 	is_action_descriptor,
+	Action,
+	resolve_action_prefix,
 } from "./simple_action_three.js"
 import { ConstMap } from "./const_map.js"
 import GLib from "gi://GLib?version=2.0"
@@ -945,7 +946,6 @@ declare module "gi://Gtk?version=4.0" {
 	}
 }
 
-// TODO: Fix improper action prefix of GtkApplication and GtkApplicationWindow classes
 Gtk.Widget.prototype.$activate_action = function (
 	this: Gtk.Widget,
 	klass: any,
@@ -953,7 +953,7 @@ Gtk.Widget.prototype.$activate_action = function (
 	...params: any[]
 ): void {
 	const descriptor: ActionDescriptor<any, any, any, any> | undefined = klass.$action_descriptors?.[name]
-	const detailed_action = `${klass.name}.${name}`
+	const detailed_action = `${resolve_action_prefix(klass)}.${name}`
 	if (descriptor?.format && params.length > 0) {
 		this.activate_action(detailed_action, new GLib.Variant(descriptor.format, params[0]))
 	} else {
