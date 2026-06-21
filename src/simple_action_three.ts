@@ -1,6 +1,8 @@
 import Gio from "gi://Gio?version=2.0"
 import GLib from "gi://GLib?version=2.0"
 
+// TODO: Document all of this!
+
 const ACTION_SYMBOL = Symbol("Symbol for GObjectify SimpleAction descriptors")
 
 type ActionKind = "void" | "state" | "param"
@@ -61,6 +63,15 @@ type ExtractActions<D> = {
 	: never
 	]: D[Key] extends ActionDescriptor<infer K, infer S, infer T, any>
 	? TypedAction<K, S, T>
+	: never
+}
+
+type ExtractActionDescriptors<D> = {
+	readonly [Key in keyof D as D[Key] extends ActionDescriptor<any, any, any, any>
+	? Key
+	: never
+	]: D[Key] extends ActionDescriptor<infer K, infer S, infer T, infer Default>
+	? ActionDescriptor<K, S, T, Default>
 	: never
 }
 
@@ -169,4 +180,4 @@ const Action = {
 const is_action_descriptor = (item: any): item is ActionDescriptor<any, any> => item?.action_symbol === ACTION_SYMBOL
 
 export { Action, is_action_descriptor }
-export type { ActionKind, ActionDescriptor, TypedAction, ExtractActions, HandleActionFormat }
+export type { ActionKind, ActionDescriptor, TypedAction, ExtractActions, ExtractActionDescriptors, HandleActionFormat }

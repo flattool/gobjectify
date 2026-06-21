@@ -19,7 +19,6 @@ import {
 } from "./property.js"
 import {
 	type SignalDescriptor,
-	type SignalArgument,
 	type SignalOverrides,
 	type RegisterableSignal,
 	Signal,
@@ -29,6 +28,7 @@ import {
 import {
 	type ActionDescriptor,
 	type ExtractActions,
+	type ExtractActionDescriptors,
 	type TypedAction,
 	Action,
 	is_action_descriptor,
@@ -81,17 +81,19 @@ type ResultingClass<
 	T extends AbstractGClassFor<GObject.Object>,
 	D extends Descriptor<D, InstanceType<T>>,
 	I extends AbstractGClassFor<GObject.Object>[],
-> = { $gtype: GObject.GType<InstanceType<T> & { readonly $unique: unique symbol }>, $params: ResultingConstructorParamsObj<T, D>[0] } & (
-	abstract new (...args: ResultingConstructorParamsObj<T, D>) => (
-		SignalOverrides<InstanceType<T>, D>
-		& InstanceType<T>
-		& ExtractWriteableProps<D>
-		& ExtractReadonlyProps<D>
-		& Finalize<ExtractChildren<D>>
-		& ExtractActions<D>
-		& Finalize<{ with_implements: I extends [] ? never : Instances<I> }>
-	)
-)
+> = {
+	readonly $gtype: GObject.GType<InstanceType<T> & { readonly $unique: unique symbol }>,
+	readonly $params: ResultingConstructorParamsObj<T, D>[0],
+	readonly $action_descriptors: ExtractActionDescriptors<D>,
+} & (abstract new (...args: ResultingConstructorParamsObj<T, D>) => (
+	SignalOverrides<InstanceType<T>, D>
+	& InstanceType<T>
+	& ExtractWriteableProps<D>
+	& ExtractReadonlyProps<D>
+	& Finalize<ExtractChildren<D>>
+	& ExtractActions<D>
+	& Finalize<{ with_implements: I extends [] ? never : Instances<I> }>
+))
 
 type ClassDecoratorParams = {
 	template?: Uint8Array | GLib.Bytes | string,
@@ -355,6 +357,8 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 			Object.setPrototypeOf(target, maybe_metadata.extend)
 		}
 
+		(target as any).$action_descriptors = Object.fromEntries(actions)
+
 		for (const [name, spec] of Object.entries(options?.manual_properties ?? {})) {
 			if (properties[name]) {
 				throw new Error(`Manual property '${name}' in GClass decorated class '${target.name}' conflicts with a property of the same name defined in the 'from' base. Please rename one of them.`)
@@ -585,6 +589,7 @@ function OnSignal<T extends GObject.Object, S extends keyof SignalsOf<T>>(
 	})
 }
 
+// TODO: Document this!
 function OnSimpleAction<
 	T extends Gtk.Widget,
 	K extends {
@@ -918,24 +923,43 @@ GObject.Object.prototype.$connect_async = function (this: GObject.Object, resolv
 	})
 } as any
 
-// declare module "gi://Gtk?version=4.0" {
-// 	export namespace Gtk {
-// 		export interface Widget {
-// 			$activate_action<
-// 				C extends abstract new (...args: any[]) => Gtk.Widget,
-// 				N extends {
-// 					[K in keyof InstanceType<C>]: InstanceType<C>[K] extends TypedActionBase ? K : never
-// 				}[keyof InstanceType<C>]
-// 			>(
-// 				klass: C,
-// 				name: N,
-// 				...param: InstanceType<C>[N] extends TypedActionState<infer T> | TypedActionParam<infer T>
-// 					? [value: T]
-// 					: []
-// 			): void,
-// 		}
-// 	}
-// }
+// TODO: Document this!
+declare module "gi://Gtk?version=4.0" {
+	export namespace Gtk {
+		export interface Widget {
+			$activate_action<
+				C extends abstract new (...args: any[]) => Gtk.Widget,
+				N extends {
+					[K in keyof InstanceType<C>]: InstanceType<C>[K] extends TypedAction<any, any, any> ? K : never
+				}[keyof InstanceType<C>]
+			>(
+				klass: C,
+				name: N,
+				...param: InstanceType<C>[N] extends TypedAction<"void", any, any>
+					? []
+					: InstanceType<C>[N] extends TypedAction<any, any, infer T>
+					? [value: T]
+					: []
+			): void,
+		}
+	}
+}
+
+// TODO: Fix improper action prefix of GtkApplication and GtkApplicationWindow classes
+Gtk.Widget.prototype.$activate_action = function (
+	this: Gtk.Widget,
+	klass: any,
+	name: string,
+	...params: any[]
+): void {
+	const descriptor: ActionDescriptor<any, any, any, any> | undefined = klass.$action_descriptors?.[name]
+	const detailed_action = `${klass.name}.${name}`
+	if (descriptor?.format && params.length > 0) {
+		this.activate_action(detailed_action, new GLib.Variant(descriptor.format, params[0]))
+	} else {
+		this.activate_action(detailed_action, null)
+	}
+} as any
 
 export {
 	from,

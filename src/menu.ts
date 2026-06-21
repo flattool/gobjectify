@@ -2,9 +2,16 @@ import GLib from "gi://GLib?version=2.0"
 import Gio from "gi://Gio?version=2.0"
 import Gtk from "gi://Gtk?version=4.0"
 
-import type { TypedAction, HandleActionFormat, ActionKind, ActionDescriptor } from "./simple_action_three.js"
+import type { TypedAction, ActionKind, ActionDescriptor } from "./simple_action_three.js"
 
-type WidgetClass = abstract new (...args: any[]) => Gtk.Widget
+// TODO: Use $action_descriptors as source of truth for actions instead of ActionsOf
+// TODO: Fix incorrect action prefixes for GtkApplication and GtkApplicationWindow classes
+
+type WidgetClass = (
+	abstract new (...args: any[]) => Gtk.Widget
+) & {
+	readonly $action_descriptors: Record<string, ActionDescriptor<any, any, any, any>>
+}
 
 type ActionsOf<G extends WidgetClass, Kinds extends ActionKind = ActionKind> = {
 	[Key in keyof InstanceType<G> as Key extends "with_implements"
