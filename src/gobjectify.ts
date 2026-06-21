@@ -290,6 +290,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 		const properties: Record<string, GObject.ParamSpec<any>> = {}
 		const property_descriptors: Record<string, PropDescriptor<any, any>> = {}
 		const children: string[] = []
+		const action_prefix = resolve_action_prefix(target)
 		const actions = new Map<string, ActionDescriptor<any, any, any, any>>()
 		const signals: Record<string, RegisterableSignal> = {}
 		let implement: (AbstractGClassFor<GObject.Object> & { $gtype: GObject.GType })[] = []
@@ -313,9 +314,10 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 					properties[name] = spec
 
 					const is_flagged_computed: boolean = value.flag === "computed"
+					const own_desc = Object.getOwnPropertyDescriptor(prototype, name)
 					const has_get_or_set: boolean = (
-						typeof (Object.getOwnPropertyDescriptor(prototype, name)?.get) === "function"
-						|| typeof (Object.getOwnPropertyDescriptor(prototype, name)?.set) === "function"
+						typeof own_desc?.get === "function"
+						|| typeof own_desc?.set === "function"
 					)
 					if (is_flagged_computed && !has_get_or_set) {
 						// Error when a computed flagged property does not have a user-provided getter and setter
@@ -347,6 +349,14 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				} else if (is_child_descriptor(value)) {
 					children.push(name.replace("_", ""))
 				} else if (is_action_descriptor(value)) {
+					if (
+						value.accels.length > 0
+						&& !(action_prefix === "win" || action_prefix === "app")
+					) throw new Error(`
+						GClass: ${target.name},
+						Action '${name}' has keyboard accels despite this GClass not extend Gtk.Application or Gtk.ApplicationWindow.
+						Actions with accels are only allowed on Gtk.Application and Gtk.ApplicationWindow subcalsses.
+					`)
 					actions.set(name, value)
 				} else if (is_signal_descriptor(value)) {
 					signals[name.replaceAll("_", "-")] = value.create()
@@ -373,10 +383,9 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 		prototype._init = function (...args: any): any {
 			const original_return_val = original_init?.apply?.(this, args)
 
-			if (is_base_metadata(maybe_metadata) && actions.size > 0) {
+			if (actions.size > 0) {
 				let action_addable: Gio.SimpleActionGroup | Gtk.ApplicationWindow | Gtk.Application | undefined
 				let accel_setter: ((detailed_action_name: string, accels: string[]) => void) | undefined
-				const action_prefix = resolve_action_prefix(target)
 
 				// TODO: Document how accels get set for GtkApplicationWindows, particularly the next_idle part
 				if (this instanceof Gtk.ApplicationWindow) {
@@ -422,7 +431,8 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 			...(options?.template && { Template: options.template }),
 		}, target)
 
-		for (const [key, spec] of Object.entries(properties)) {
+		for (const [key, prop] of Object.entries(property_descriptors)) {
+			const spec = properties[key]!
 			if (
 				!(spec.flags & GObject.ParamFlags.WRITABLE)
 				|| spec.flags & GObject.ParamFlags.CONSTRUCT_ONLY
@@ -434,8 +444,6 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 					Writeable custom GObject property '${key}' is missing a getter or a setter function.
 				`)
 			}
-			const prop: PropDescriptor<any, any> | undefined = property_descriptors[key]
-			if (!prop) continue
 			const accessors = make_accessors(target.name, key, prop, desc, spec)
 			Object.defineProperty(prototype, key, {
 				configurable: desc.configurable ?? true,
