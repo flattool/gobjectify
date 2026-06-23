@@ -3,7 +3,7 @@ import GLib from "gi://GLib?version=2.0"
 
 import { ConstMap } from "./const_map.js"
 
-type GClass<T extends GObject.Object = GObject.Object> = {$gtype: GObject.GType} & (abstract new (...args: any[]) => T)
+type GClass<T extends GObject.Object = GObject.Object> = { $gtype: GObject.GType } & (abstract new (...args: any[]) => T)
 type GEnum<T extends number = number> = { $gtype: GObject.GType<T> }
 
 const PROPERTY_SYMBOL = Symbol("Symbol for GObjectify Property descriptors")
@@ -35,18 +35,18 @@ type PrimitiveCastable<Wide, Default, F extends FlagStrings> = {
 	/**
 	 * Type helper to allow narrowing of a property descriptor's type.
 	 * A default value is required to exist, and the default value must extend the narrowed value.
-	 * 
+	 *
 	 * @template Narrow The narrowed type
-	 * 
+	 *
 	 * @example
 	 * ```ts
 	 * Property.rw.string("user").as<"user" | "admin">() // This property now only allows "user" or "admin", instead of all strings
 	 * ```
 	 */
 	as<Narrow extends Wide>(): (
-		Default extends Narrow ? PropDescriptor<Narrow, F> :
-		[never] & void
-	)
+		Default extends Narrow ? PropDescriptor<Narrow, F>
+			: [never] & void
+	),
 }
 type NarrowablePrimitiveDescriptor<T, Default, F extends FlagStrings> = (
 	PropDescriptor<T, F>
@@ -82,14 +82,14 @@ type Primitives = {
 type PrimitiveTypes = { [K in keyof Primitives]: Primitives[K] }[keyof Primitives]
 
 type PrimitiveNeedsDefault<T extends PrimitiveTypes, F extends FlagStrings> = (
-	T extends GEnum ? true :
-	F extends "const" ? true :
-	false
+	T extends GEnum ? true
+		: F extends "const" ? true
+			: false
 )
 
 type PrimitiveFactory<T extends PrimitiveTypes, F extends FlagStrings> = <const Default extends T>(...args:
-	F extends "computed" ? [] :
-	PrimitiveNeedsDefault<T, F> extends true
+F extends "computed" ? []
+	: PrimitiveNeedsDefault<T, F> extends true
 		? [default_value: Default, ...(T extends number ? [config?: { min: number, max: number }] : [])]
 		: [default_value?: Default, ...(T extends number ? [config?: { min: number, max: number }] : [])]
 ) => NarrowablePrimitiveDescriptor<T, Default, F>
@@ -103,7 +103,7 @@ function make_numeric_factory<F extends FlagStrings>(
 		const { min, max } = args[1] ?? { min: default_min, max: default_max }
 		const default_value = args[0] ?? (0 >= min && 0 <= max ? 0 : min)
 		if (default_value < min || default_value > max) throw new RangeError(
-			`Default value '${default_value}' is out of range for property of type '${kind}' with min '${min}' and max '${max}'`
+			`Default value '${default_value}' is out of range for property of type '${kind}' with min '${min}' and max '${max}'`,
 		)
 		return {
 			flag,
@@ -123,7 +123,7 @@ function make_numeric_factory<F extends FlagStrings>(
 					value = Math.trunc(value)
 				}
 				return value
-			}
+			},
 		}
 	}
 }
@@ -133,7 +133,7 @@ type PrimitiveFactories<F extends FlagStrings> = PrimitiveFactoriesEnsurer<F, {
 	/**
 	 * Creates a number property descriptor, known to GObject as an int32, for use with `from` and `GClass`.
 	 * The largest possible range for this property is that of a signed 32-bit integer, but this can be reduced with the `min` and `max` config options.
-	 * 
+	 *
 	 * @param default_value The default value to give to the property. Defaults to `0` or `min` if `0` is out of range.
 	 * `"computed"` properties cannot accept a default, `const` properties require a default.
 	 * @param config Extra configuration options. `computed` properties cannot accept a config.
@@ -144,7 +144,7 @@ type PrimitiveFactories<F extends FlagStrings> = PrimitiveFactoriesEnsurer<F, {
 	/**
 	 * Creates a number property descriptor, known to GObject as a uint32, for use with `from` and `GClass`.
 	 * The largest possible range for this property is that of an unsigned 32-bit integer, but this can be reduced with the `min` and `max` config options.
-	 * 
+	 *
 	 * @param default_value The default value to give to the property. Defaults to `0` or `min` if `0` is out of range.
 	 * `"computed"` properties cannot accept a default, `const` properties require a default.
 	 * @param config Extra configuration options. `computed` properties cannot accept a config.
@@ -155,7 +155,7 @@ type PrimitiveFactories<F extends FlagStrings> = PrimitiveFactoriesEnsurer<F, {
 	/**
 	 * Creates a number property descriptor, known to GObject as a double, for use with `from` and `GClass`.
 	 * The largest possible range for this property is that of a double precision float (the same as JS number), but this can be reduced with the `min` and `max` config options.
-	 * 
+	 *
 	 * @param default_value The default value to give to the property. Defaults to `0` or `min` if `0` is out of range.
 	 * `"computed"` properties cannot accept a default, `const` properties require a default.
 	 * @param config Extra configuration options. `computed` properties cannot accept a config.
@@ -165,14 +165,14 @@ type PrimitiveFactories<F extends FlagStrings> = PrimitiveFactoriesEnsurer<F, {
 	double: PrimitiveFactory<number, F>,
 	/**
 	 * Creates a string property descriptor for use with `from` and `GClass`.
-	 * 
+	 *
 	 * @param default_value The default value to give to the property. Defaults to `""` (an empty string).
 	 * `computed` properties cannot accept a default, `const` properties require a default.
 	 */
 	string: PrimitiveFactory<string, F>,
 	/**
 	 * Creates a boolean property descriptor for use with `from` and `GClass`.
-	 * 
+	 *
 	 * @param default_value The default value to give to the property. Defaults to `false`.
 	 * `computed` properties cannot accept a default, `const` properties require a default.
 	 */
@@ -180,10 +180,10 @@ type PrimitiveFactories<F extends FlagStrings> = PrimitiveFactoriesEnsurer<F, {
 }> & {
 	/**
 	 * Creates a GObject Enum property descriptor for use with `from` and `GClass`.
-	 * 
+	 *
 	 * @param kind The GObject Enum class that this property will be typed to
 	 * @param default_value The default value given to the property. It is required, because Enums do not have a reliable 0-value
-	 * 
+	 *
 	 * GEnum properties cannot be `computed`
 	 */
 	genum<T extends number, E extends GEnum<T>>(
@@ -223,25 +223,25 @@ const make_primitive_factories = <F extends FlagStrings>(flag: F): PrimitiveFact
 			create: (name) => GObject.ParamSpec.enum(name, null, null, FLAG_PRESETS[flag], genum.$gtype, default_value),
 			validate_value: (value, _spec) => value ?? default_value,
 		} satisfies PropDescriptor<unknown, F> as any
-	}
+	},
 })
 
 type ObjectFactories<F extends FlagStrings> = {
 	/**
 	 * Creates a GObject.Object property descriptor for use with `from` and `GClass`.
-	 * 
+	 *
 	 * All GObject.Object properties are also nullable, because GObject cannot ensure that a null value isn't set.
 	 * The default value for GObject.Object properties is always null, and cannot be changed.
-	 * 
+	 *
 	 * @param kind The GObject class that this property will be typed to
 	 */
 	gobject<G extends GClass>(kind: G): PropDescriptor<InstanceType<G> | null, F> & {
 		/**
 		 * Type helper to allow narrowing of a property descriptor's type.
 		 * A default value is required to exist, and the default value must extend the narrowed value.
-		 * 
+		 *
 		 * @template Narrow The narrowed type
-		 * 
+		 *
 		 * @example
 		 * ```ts
 		 * Property.rw.gobject(Gtk.Widget).as<Gtk.ListBox | Gtk.Box>() // This property now only allows instances of Box or ListBox, instead of all widgets
@@ -251,7 +251,7 @@ type ObjectFactories<F extends FlagStrings> = {
 	},
 	/**
 	 * Creates a JavaScript Object property descriptor for use with `from` and `GClass`.
-	 * 
+	 *
 	 * All JS object properties are also nullable, because GObject cannot ensure that a null value isn't set.
 	 * The default value for JS object properties is always null, and cannot be changed.
 	 */
@@ -259,15 +259,15 @@ type ObjectFactories<F extends FlagStrings> = {
 		/**
 		 * Type helper to allow narrowing of a property descriptor's type.
 		 * A default value is required to exist, and the default value must extend the narrowed value.
-		 * 
+		 *
 		 * @template Narrow The narrowed type
-		 * 
+		 *
 		 * @example
 		 * ```ts
 		 * Property.jsobject().as<TypeOne | TypeTwo>() // This property now only allows instances of TypeOne or TypeTwo, instead of all objects
 		 * ```
 		 */
-		as<Narrow extends object>(): PropDescriptor<Narrow | null, F>
+		as<Narrow extends object>(): PropDescriptor<Narrow | null, F>,
 	},
 }
 const make_object_factories = <F extends FlagStrings>(flag: F): ObjectFactories<F> => ({
@@ -301,9 +301,9 @@ const make_factories = <F extends FlagStrings>(flag: F): PropFactories<F> => (fl
 
 /**
  * Create properties for use with `from` and `GClass`.
- * 
+ *
  * Properties are the main way to have reactive state stored in a GObject subclass.
- * 
+ *
  * The following modifiers determine if and when properties can be written to, and how they may be written.
  */
 const Property = {
@@ -319,11 +319,11 @@ const Property = {
 	/**
 	 * Properties of this modifier are writeable at all times post-construction,
 	 * but are not allowed to be written to during construction (via `super()` or `new`).
-	 * 
+	 *
 	 * Computed properties require a `get` and `set` method to be present on the subclass,
 	 * and use those to read and write values. Early-reads that may happen before construction finishes
 	 * will see the fallback value of the property type (0, "", false, null).
-	 * 
+	 *
 	 * Computed properties do not support specifying default values, and GEnums cannot be computed.
 	 */
 	computed: make_factories("computed"),

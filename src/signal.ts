@@ -36,13 +36,13 @@ type ExtractSignals<D> = {
 }
 
 type UnwrapSignalArg<T> = (
-	T extends GObject.GType<infer G> ? UnwrapSignalArg<G> :
-	T extends ObjectConstructor ? object | null :
-	T extends NumberConstructor ? number :
-	T extends StringConstructor ? string :
-	T extends BooleanConstructor ? boolean :
-	T extends abstract new (...args: any[]) => infer O ? O | null :
-	T
+	T extends GObject.GType<infer G> ? UnwrapSignalArg<G>
+		: T extends ObjectConstructor ? object | null
+			: T extends NumberConstructor ? number
+				: T extends StringConstructor ? string
+					: T extends BooleanConstructor ? boolean
+						: T extends abstract new (...args: any[]) => infer O ? O | null
+							: T
 )
 
 type UnwrapSignalArgs<T extends readonly unknown[]> = {
@@ -99,7 +99,7 @@ type SignalOverrides<T extends GObject.Object, D> = {
 	 * @param resolve_signal The signal name whose emission will resolve the promise.
 	 * @param reject_signal Optional signal name whose emission will reject the promise.
 	 * @returns A promise that resolves with the arguments emitted by `resolve_signal`.
-	 * 
+	 *
 	 * @remarks
 	 * Only signals with a `void` return type can be awaited. Signals that return
 	 * a value cannot be used with `$connect_async`, as the return value is
@@ -134,7 +134,7 @@ type SignalOverrides<T extends GObject.Object, D> = {
 			? ExtractSignals<D>[S] extends SignalDescriptor<infer Args, void>
 				? Promise<UnwrapSignalArgs<Args>>
 				: never
-			: never
+			: never,
 	$signals: {
 		[Key in keyof ExtractSignals<D>]: ExtractSignals<D>[Key] extends SignalDescriptor<infer Args, infer Ret>
 			? (...args: UnwrapSignalArgs<Args>) => (Ret extends void ? void : UnwrapSignalArg<Ret>)
@@ -150,15 +150,15 @@ const signal_descriptor_args_to_gtypes = (item: SignalArgument): GObject.GType =
 
 /**
  * Creates a Signal descriptor for use with `from` and `GClass`.
- * 
+ *
  * `from` and `GClass` will register the signals on the subclass, allowing them to be connected and emitted.
- * 
+ *
  * Note: any signals with underscores ('_') in their names will be remapped to hyphens ('-'). Example: `"user_added"` -> `"user-added"`.
  * Use these remapped names when connecting and emitting the signals.
- * 
+ *
  * Tip: GObjectify's provided `$connect`, `$connect_after`, `$connect_async`, and `$emit` methods are type-aware,
  * and will give auto-complete suggestions for these signals, as well as ensure arguments and returned values match the declared types.
- * 
+ *
  * @param parameters The types of values that must be emitted, and that will be passed to connected functions.
  * Allows for the following:
  * - `Number` (maps to GObject.TYPE_DOUBLE)
@@ -168,7 +168,7 @@ const signal_descriptor_args_to_gtypes = (item: SignalArgument): GObject.GType =
  * - Any GObject subclass
  * - Any GObject enum
  * @param options Advanced signal configuration options. Refer to GObject Signal documentation for more information
- * 
+ *
  * @example
  * ```ts
  * @GClass()
@@ -187,7 +187,7 @@ const Signal = <const A extends [] | SignalArgument[] = [], const R extends Sign
 		return_type?: R,
 		flags?: GObject.SignalFlags,
 		accumulator?: GObject.AccumulatorType,
-	}
+	},
 ): ([] extends A
 	? void extends R
 		? SignalDescriptor<[], void>

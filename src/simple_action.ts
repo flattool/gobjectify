@@ -21,7 +21,7 @@ type ExtractActions<D> = {
  * `from()` and `GClass` will see this descriptor and connect up the action to the instance on instantiation.
  *
  * @param params Optional parameters for the SimpleAction. See `new Gio.SimpleAction()` constructor parameters
- * 
+ *
  * Note that `params.accels` is only used for classes extending Gtk.Application, it is ignored for all other base types.
  *
  * @example

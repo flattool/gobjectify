@@ -5,7 +5,7 @@
 export class ConstMap<const Pairs extends [any, any][]> {
 	readonly #map: ReadonlyMap<Pairs[number][0], Pairs[number][1]>
 
-	public constructor(...pairs: Pairs) {
+	constructor(...pairs: Pairs) {
 		this.#map = Object.freeze(new Map(pairs))
 	}
 
@@ -17,7 +17,7 @@ export class ConstMap<const Pairs extends [any, any][]> {
 	 *
 	 * @param key A key in the map. This value is typed as only ever allowing known values that are in the map.
 	 */
-	public get<K extends Pairs[number][0]>(key: K): Extract<Pairs[number], [K, any]>[1] {
+	get<K extends Pairs[number][0]>(key: K): Extract<Pairs[number], [K, any]>[1] {
 		return this.#map.get(key)!
 	}
 
@@ -29,15 +29,15 @@ export class ConstMap<const Pairs extends [any, any][]> {
 	 *
 	 * @param key
 	 */
-	public looseGet(key: any): Extract<Pairs[number], [any, any]>[1] | undefined {
+	looseGet(key: any): Extract<Pairs[number], [any, any]>[1] | undefined {
 		return this.#map.get(key)
 	}
 
-	public asMap(): ReadonlyMap<Pairs[number][0], Pairs[number][1]> {
+	asMap(): ReadonlyMap<Pairs[number][0], Pairs[number][1]> {
 		return this.#map
 	}
 
-	public *[Symbol.iterator](): IterableIterator<Pairs[number]> {
+	*[Symbol.iterator](): IterableIterator<Pairs[number]> {
 		for (const pair of this.#map) yield pair
 	}
 }

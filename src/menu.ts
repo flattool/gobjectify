@@ -10,20 +10,20 @@ import { resolve_action_prefix } from "./simple_action_three.js"
 type WidgetClass = (
 	abstract new (...args: any[]) => Gtk.Widget
 ) & {
-	readonly $action_descriptors: Record<string, ActionDescriptor<any, any, any, any>>
+	readonly $action_descriptors: Record<string, ActionDescriptor<any, any, any, any>>,
 }
 
 type ActionsOf<G extends WidgetClass, Kinds extends ActionKind = ActionKind> = {
 	[Key in keyof InstanceType<G> as Key extends "with_implements"
-	? never
-	: InstanceType<G>[Key] extends TypedAction<infer Kind, any, any>
-	? Kind extends Kinds
-	? Key
-	: never
-	: never
+		? never
+		: InstanceType<G>[Key] extends TypedAction<infer Kind, any, any>
+			? Kind extends Kinds
+				? Key
+				: never
+			: never
 	]: InstanceType<G>[Key] extends TypedAction<any, any, any>
-	? InstanceType<G>[Key]
-	: never
+		? InstanceType<G>[Key]
+		: never
 }
 type ParamStateTypeOf<D extends ActionDescriptor<any, any, any, any>> = (
 	D extends ActionDescriptor<any, any, infer T, any> ? T : never
@@ -74,7 +74,7 @@ function item<
 >(
 	klass: G,
 	key: K,
-	config: MenuItemInput<ParamStateTypeOf<ActionsOf<G>[K]>, KindOf<ActionsOf<G>[K]>>
+	config: MenuItemInput<ParamStateTypeOf<ActionsOf<G>[K]>, KindOf<ActionsOf<G>[K]>>,
 ): Gio.MenuItem {
 	const descriptor: ActionDescriptor<any, any> = (klass as any).$action_descriptors[key]
 	const detailed_action = `${resolve_action_prefix(klass)}.${String(key)}`
@@ -128,10 +128,9 @@ type MenuItemOrItems = (Gio.MenuItem | Gio.MenuItem[])[]
 
 function flatten_items(items: MenuItemOrItems): Gio.MenuItem[] {
 	const flat: Gio.MenuItem[] = []
-	items.forEach((item) => Array.isArray(item)
+	items.forEach((item) => (Array.isArray(item)
 		? flat.push(...item)
-		: flat.push(item)
-	)
+		: flat.push(item)))
 	return flat
 }
 

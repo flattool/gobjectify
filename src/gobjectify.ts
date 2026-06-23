@@ -46,24 +46,24 @@ type Finalize<D> = {
 
 type PropsAllowedForPropAction<D> = keyof {
 	[Key in keyof D as D[Key] extends PropDescriptor<infer T, infer F>
-	? [T, F] extends [number | boolean | string, "readwrite"]
-	? Key
-	: never
-	: never
+		? [T, F] extends [number | boolean | string, "readwrite"]
+			? Key
+			: never
+		: never
 	]: Key
 }
 
 type Descriptor<D, T extends GObject.Object> = {
 	[Key in keyof D as Key extends string
-	? Key
-	: never
+		? Key
+		: never
 	]: Key extends keyof T
-	? never
-	: (Key extends `_${string}`
-		? ChildDescriptor<GObject.Object>
-		: Key extends keyof T["$signals"]
-		? PropDescriptor<any, any>
-		: PropDescriptor<any, any> | SignalDescriptor<any[], any>
+		? never
+		: (Key extends `_${string}`
+			? ChildDescriptor<GObject.Object>
+			: Key extends keyof T["$signals"]
+				? PropDescriptor<any, any>
+				: PropDescriptor<any, any> | SignalDescriptor<any[], any>
 	) | (T extends Gtk.Application | Gtk.ApplicationWindow | Gtk.Widget
 		? (
 			ActionDescriptor<Exclude<ActionKind, "prop">, any, any, any>
@@ -82,14 +82,14 @@ type ValidConstructorProps<D> = {
 
 type ResultingConstructorParamsObj<
 	T extends AbstractGClassFor<GObject.Object>,
-	D extends Descriptor<D, InstanceType<T>>
+	D extends Descriptor<D, InstanceType<T>>,
 > = ConstructorParameters<T> extends []
 	? [ValidConstructorProps<D>]
 	: ConstructorParameters<T> extends [(infer First)?, ...infer Rest]
-	? undefined extends ConstructorParameters<T>[0]
-	? [(ValidConstructorProps<D> & First)?, ...Rest]
-	: [(ValidConstructorProps<D> & First), ...Rest]
-	: never
+		? undefined extends ConstructorParameters<T>[0]
+			? [(ValidConstructorProps<D> & First)?, ...Rest]
+			: [(ValidConstructorProps<D> & First), ...Rest]
+		: never
 
 type ResultingClass<
 	T extends AbstractGClassFor<GObject.Object>,
@@ -120,14 +120,14 @@ type ClassDecoratorParams = {
 
 type WatchPropKeys<T extends GObject.Object> = {
 	[Key in keyof T]: Key extends string
-	? Key extends `_${string}`
-	? never
-	: Key extends "with_implements" | "$signals"
-	? never
-	: T[Key] extends Function
-	? never
-	: Key
-	: never
+		? Key extends `_${string}`
+			? never
+			: Key extends "with_implements" | "$signals"
+				? never
+				: T[Key] extends Function
+					? never
+					: Key
+		: never
 }[keyof T]
 
 const GOBJECTIFY_FROM_SYMBOL = Symbol("GOBJECTIFY_FROM_SYMBOL")
@@ -147,10 +147,10 @@ function is_base_metadata(item: any): item is BaseMetadata<any, GClassFor<GObjec
 
 type Instances<I extends (abstract new (...args: any) => any)[]> = I extends [infer First, ...infer Rest]
 	? First extends abstract new (...args: any) => any
-	? Rest extends (abstract new (...args: any) => any)[]
-	? InstanceType<First> & Instances<Rest>
-	: InstanceType<First>
-	: never
+		? Rest extends (abstract new (...args: any) => any)[]
+			? InstanceType<First> & Instances<Rest>
+			: InstanceType<First>
+		: never
 	: unknown
 
 /**
@@ -178,7 +178,7 @@ type Instances<I extends (abstract new (...args: any) => any)[]> = I extends [in
  * @remarks
  * The returned class will not function as expected on its own. **Always use `from` with a subclass and with the
  * `GClass` decorator**.
- * 
+ *
  * The returned class exposes a static `$params` field purely for constructor type information. It has no runtime value.
  * It is purely useful for when overriding the constructor, to ensure you have all of the parameter type information.
  * You would use it via: `constructor(params: typeof MyClassName.$params) { super(params) }`
@@ -505,7 +505,7 @@ function Debounce<T extends GObject.Object, U extends (this: T, ...args: any[]) 
 				original_method.apply(this, args)
 			} else {
 				(this as any)[last_args_symbol] = args
-					; (this as any)[should_call_trailing_symbol] = true
+				; (this as any)[should_call_trailing_symbol] = true
 			}
 			if ((this as any)[timeout_symbol]) {
 				GLib.source_remove((this as any)[timeout_symbol])
@@ -517,7 +517,7 @@ function Debounce<T extends GObject.Object, U extends (this: T, ...args: any[]) 
 					(this as any)[timeout_symbol] = null
 					if (trailing && (this as any)[should_call_trailing_symbol]) {
 						original_method.apply(this, (this as any)[last_args_symbol] ?? [])
-							; (this as any)[should_call_trailing_symbol] = false
+						; (this as any)[should_call_trailing_symbol] = false
 					}
 					return GLib.SOURCE_REMOVE
 				},
@@ -623,18 +623,18 @@ function OnSimpleAction<
 	T extends GObject.Object,
 	K extends {
 		[Key in keyof T]: Key extends "with_implements"
-		? never
-		: T[Key] extends Gio.SimpleAction | TypedAction<any, any, any>
-		? Key
-		: never
+			? never
+			: T[Key] extends Gio.SimpleAction | TypedAction<any, any, any>
+				? Key
+				: never
 	}[keyof T],
 	U extends T[K] extends Gio.SimpleAction
-	? (this: T, variant: GLib.Variant) => any
-	: T[K] extends TypedAction<infer Kind, any, infer N>
-	? Kind extends "param" | "state"
-	? (this: T, param_state: N) => any
-	: (this: T) => any
-	: never
+		? (this: T, variant: GLib.Variant) => any
+		: T[K] extends TypedAction<infer Kind, any, infer N>
+			? Kind extends "param" | "state"
+				? (this: T, param_state: N) => any
+				: (this: T) => any
+			: never,
 >(action_name: K) {
 	return function (target: U, context: ClassMethodDecoratorContext<T>): void {
 		context.addInitializer(function (this: T): void {
@@ -864,21 +864,21 @@ declare module "gi://GObject?version=2.0" {
 				callback: Self["$signals"][S] extends (...args: infer Args) => infer Ret
 					? (self: Self, ...args: Args) => Ret
 					: never,
-			): number,
+			): number
 			$connect_after<const Self extends GObject.Object, S extends keyof Self["$signals"]>(
 				this: Self,
 				signal_name: S,
 				callback: Self["$signals"][S] extends (...args: infer Args) => infer Ret
 					? (self: Self, ...args: Args) => Ret
 					: never,
-			): number,
+			): number
 			$emit<const Self extends GObject.Object, S extends keyof Self["$signals"]>(
 				this: Self,
 				signal_name: S,
 				...args: Self["$signals"][S] extends (...args: infer Args) => any
 					? Args
 					: never,
-			): void,
+			): void
 			/**
 			 * Connects to a GObject signal and returns a Promise that resolves the first time the signal is emitted.
 			 *
@@ -892,7 +892,7 @@ declare module "gi://GObject?version=2.0" {
 			 * @param resolve_signal The signal name whose emission will resolve the promise.
 			 * @param reject_signal Optional signal name whose emission will reject the promise.
 			 * @returns A promise that resolves with the arguments emitted by `resolve_signal`.
-			 * 
+			 *
 			 * @remarks
 			 * Only signals with a `void` return type can be awaited. Signals that return
 			 * a value cannot be used with `$connect_async`, as the return value is
@@ -924,7 +924,7 @@ declare module "gi://GObject?version=2.0" {
 				reject_signal?: keyof Self["$signals"]
 			): Self["$signals"][S] extends (...args: infer Args) => void
 				? Promise<Args>
-				: never,
+				: never
 		}
 	}
 }
@@ -961,16 +961,16 @@ declare module "gi://Gtk?version=4.0" {
 				C extends abstract new (...args: any[]) => Gtk.Widget,
 				N extends {
 					[K in keyof InstanceType<C>]: InstanceType<C>[K] extends TypedAction<any, any, any> ? K : never
-				}[keyof InstanceType<C>]
+				}[keyof InstanceType<C>],
 			>(
 				klass: C,
 				name: N,
 				...param: InstanceType<C>[N] extends TypedAction<"void", any, any>
 					? []
 					: InstanceType<C>[N] extends TypedAction<any, any, infer T>
-					? [value: T]
-					: []
-			): void,
+						? [value: T]
+						: []
+			): void
 		}
 	}
 }
