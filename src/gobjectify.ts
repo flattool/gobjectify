@@ -30,6 +30,7 @@ import {
 	type ExtractActions,
 	type ExtractActionDescriptors,
 	type TypedAction,
+	type ActionKind,
 	is_action_descriptor,
 	SimpleAction,
 	resolve_action_prefix,
@@ -41,6 +42,15 @@ declare const no_override: unique symbol
 type Final<T> = T & typeof no_override
 type Finalize<D> = {
 	[K in keyof D]: Final<D[K]>
+}
+
+type PropsAllowedForPropAction<D> = keyof {
+	[Key in keyof D as D[Key] extends PropDescriptor<infer T, infer F>
+	? [T, F] extends [number | boolean | string, "readwrite"]
+	? Key
+	: never
+	: never
+	]: Key
 }
 
 type Descriptor<D, T extends GObject.Object> = {
@@ -55,7 +65,10 @@ type Descriptor<D, T extends GObject.Object> = {
 		? PropDescriptor<any, any>
 		: PropDescriptor<any, any> | SignalDescriptor<any[], any>
 	) | (T extends Gtk.Application | Gtk.ApplicationWindow | Gtk.Widget
-		? ActionDescriptor<any, any, any, any>
+		? (
+			ActionDescriptor<Exclude<ActionKind, "prop">, any, any, any>
+			| ActionDescriptor<"prop", `property::${PropsAllowedForPropAction<D>}`, any, any>
+		)
 		: never
 	)
 }
@@ -625,7 +638,7 @@ function OnSimpleAction<
 >(action_name: K) {
 	return function (target: U, context: ClassMethodDecoratorContext<T>): void {
 		context.addInitializer(function (this: T): void {
-			const action = this[action_name] as Gio.SimpleAction | TypedAction<any, any>
+			const action = this[action_name] as Gio.SimpleAction | TypedAction<any, any, any>
 			if (action instanceof Gio.SimpleAction) {
 				action.connect("activate", (_action, ...rest) => (target as any).apply(this, rest))
 			} else {
