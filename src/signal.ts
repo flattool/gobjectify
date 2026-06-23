@@ -148,6 +148,7 @@ const signal_descriptor_args_to_gtypes = (item: SignalArgument): GObject.GType =
 	return item // known to be a GObject.GType
 }
 
+/* eslint-disable */
 /**
  * Creates a Signal descriptor for use with `from` and `GClass`.
  *
@@ -206,6 +207,8 @@ const Signal = <const A extends [] | SignalArgument[] = [], const R extends Sign
 		return_type: options?.return_type && signal_descriptor_args_to_gtypes(options.return_type),
 	}),
 } satisfies SignalDescriptor<any, any> as any)
+
+/* eslint-enable */
 
 function is_signal_descriptor(item: any): item is SignalDescriptor<SignalArgument[], SignalArgument | void> {
 	return item?.signal_symbol === SIGNAL_SYMBOL

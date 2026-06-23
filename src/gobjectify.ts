@@ -44,14 +44,14 @@ type Finalize<D> = {
 	[K in keyof D]: Final<D[K]>
 }
 
-type PropsAllowedForPropAction<D> = keyof {
-	[Key in keyof D as D[Key] extends PropDescriptor<infer T, infer F>
-		? [T, F] extends [number | boolean | string, "readwrite"]
-			? Key
-			: never
-		: never
-	]: Key
-}
+// type PropsAllowedForPropAction<D> = keyof {
+// 	[Key in keyof D as D[Key] extends PropDescriptor<infer T, infer F>
+// 		? [T, F] extends [number | boolean | string, "readwrite"]
+// 			? Key
+// 			: never
+// 		: never
+// 	]: Key
+// }
 
 type Descriptor<D, T extends GObject.Object> = {
 	[Key in keyof D as Key extends string
@@ -65,10 +65,7 @@ type Descriptor<D, T extends GObject.Object> = {
 				? PropDescriptor<any, any>
 				: PropDescriptor<any, any> | SignalDescriptor<any[], any>
 	) | (T extends Gtk.Application | Gtk.ApplicationWindow | Gtk.Widget
-		? (
-			ActionDescriptor<Exclude<ActionKind, "prop">, any, any, any>
-			| ActionDescriptor<"prop", `property::${PropsAllowedForPropAction<D>}`, any, any>
-		)
+		? ActionDescriptor<any, any, any, any>
 		: never
 	)
 }
@@ -214,10 +211,10 @@ const make_accessors = (
 	let get: (this: any) => any
 	let set: (this: any, val: any) => void
 	if (prop.flag === "readonly") {
-		get = function () {
+		get = function (): any {
 			return prop.validate_value(desc.get!.call(this), spec)
 		}
-		set = function (val) {
+		set = function (val): any {
 			if (this[INIT_FINISHED_SYMBOL]) {
 				throw new Error(dedent`
 					GClass: ${class_name}
@@ -228,13 +225,13 @@ const make_accessors = (
 			desc.set!.call(this, prop.validate_value(val, spec))
 		}
 	} else if (prop.flag === "computed") {
-		get = function () {
+		get = function (): any {
 			if (!this[INIT_FINISHED_SYMBOL]) {
 				return prop.validate_value(spec.get_default_value(), spec)
 			}
 			return prop.validate_value(desc.get!.call(this), spec)
 		}
-		set = function (val) {
+		set = function (val): any {
 			if (!this[INIT_FINISHED_SYMBOL]) {
 				throw new Error(dedent`
 					GClass: ${class_name}
@@ -244,10 +241,10 @@ const make_accessors = (
 			desc.set!.call(this, prop.validate_value(val, spec))
 		}
 	} else {
-		get = function () {
+		get = function (): any {
 			return prop.validate_value(desc.get!.call(this), spec)
 		}
-		set = function (val) {
+		set = function (val): any {
 			desc.set!.call(this, prop.validate_value(val, spec))
 		}
 	}
@@ -362,6 +359,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				} else if (is_child_descriptor(value)) {
 					children.push(name.replace("_", ""))
 				} else if (is_action_descriptor(value)) {
+					/* eslint-disable */
 					if (
 						value.accels.length > 0
 						&& !(action_prefix === "win" || action_prefix === "app")
@@ -389,6 +387,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 			}
 			properties[name] = spec
 		}
+		/* eslint-enable */
 
 		// runs when an instance is created, thanks GTK for having an init hook
 		// -------------------------------------------------------------------
@@ -403,7 +402,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				// TODO: Document how accels get set for GtkApplicationWindows, particularly the next_idle part
 				if (this instanceof Gtk.ApplicationWindow) {
 					action_addable = this
-					accel_setter = (detailed_name, accels) => {
+					accel_setter = (detailed_name, accels): void => {
 						if (accels.length < 1) return
 						next_idle().then(() => this.get_application()?.set_accels_for_action(detailed_name, accels))
 					}
@@ -855,6 +854,7 @@ function dedent(strings: TemplateStringsArray, ...values: any[]): string {
 	return lines.map((line) => (line.trim() === "" ? line : line.slice(mindent))).join("\n")
 }
 
+/* eslint-disable */
 declare module "gi://GObject?version=2.0" {
 	export namespace GObject {
 		export interface Object {
@@ -929,10 +929,16 @@ declare module "gi://GObject?version=2.0" {
 	}
 }
 
+/* eslint-enable */
+
 GObject.Object.prototype.$connect = GObject.Object.prototype.connect
 GObject.Object.prototype.$connect_after = GObject.Object.prototype.connect_after
 GObject.Object.prototype.$emit = GObject.Object.prototype.emit
-GObject.Object.prototype.$connect_async = function (this: GObject.Object, resolve_signal: string, reject_signal?: string): Promise<any> {
+GObject.Object.prototype.$connect_async = function (
+	this: GObject.Object,
+	resolve_signal: string,
+	reject_signal?: string,
+): Promise<any> {
 	return new Promise((resolve, reject) => {
 		let resolve_id: number | undefined
 		let reject_id: number | undefined

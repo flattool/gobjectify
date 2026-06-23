@@ -3,15 +3,21 @@ import GLib from "gi://GLib?version=2.0"
 
 import { ConstMap } from "./const_map.js"
 
-type GClass<T extends GObject.Object = GObject.Object> = { $gtype: GObject.GType } & (abstract new (...args: any[]) => T)
+type GClass<T extends GObject.Object = GObject.Object> = { $gtype: GObject.GType } & (
+	abstract new (...args: any[]) => T
+)
 type GEnum<T extends number = number> = { $gtype: GObject.GType<T> }
 
 const PROPERTY_SYMBOL = Symbol("Symbol for GObjectify Property descriptors")
 const FLAG_PRESETS = {
 	readwrite: GObject.ParamFlags.CONSTRUCT | GObject.ParamFlags.READWRITE,
-	readonly: GObject.ParamFlags.CONSTRUCT | GObject.ParamFlags.READWRITE, // Will be treated by GObjectify as readonly post-init
-	computed: GObject.ParamFlags.READWRITE, // CONSTRUCT removed so that `override get` and `override set` will work
 	const: GObject.ParamFlags.READABLE,
+
+	// Will be treated by GObjectify as readonly post-init
+	readonly: GObject.ParamFlags.CONSTRUCT | GObject.ParamFlags.READWRITE,
+
+	// CONSTRUCT removed so that `override get` and `override set` will work
+	computed: GObject.ParamFlags.READWRITE,
 } as const
 
 type FlagStrings = keyof typeof FLAG_PRESETS
@@ -40,7 +46,8 @@ type PrimitiveCastable<Wide, Default, F extends FlagStrings> = {
 	 *
 	 * @example
 	 * ```ts
-	 * Property.rw.string("user").as<"user" | "admin">() // This property now only allows "user" or "admin", instead of all strings
+	 * // This property now only allows "user" or "admin", instead of all strings
+	 * Property.rw.string("user").as<"user" | "admin">()
 	 * ```
 	 */
 	as<Narrow extends Wide>(): (
@@ -103,6 +110,7 @@ function make_numeric_factory<F extends FlagStrings>(
 		const { min, max } = args[1] ?? { min: default_min, max: default_max }
 		const default_value = args[0] ?? (0 >= min && 0 <= max ? 0 : min)
 		if (default_value < min || default_value > max) throw new RangeError(
+			// eslint-disable-next-line
 			`Default value '${default_value}' is out of range for property of type '${kind}' with min '${min}' and max '${max}'`,
 		)
 		return {
@@ -112,7 +120,7 @@ function make_numeric_factory<F extends FlagStrings>(
 			max,
 			create: (name) => spec(name, null, null, FLAG_PRESETS[flag], min, max, default_value),
 			as(): any { return this },
-			validate_value: (value, _spec) => {
+			validate_value: (value, _spec): any => {
 				value ??= default_value
 				if (value < min) {
 					value = min
@@ -128,7 +136,11 @@ function make_numeric_factory<F extends FlagStrings>(
 	}
 }
 
-type PrimitiveFactoriesEnsurer<F extends FlagStrings, C extends { [K in keyof Primitives]: PrimitiveFactory<Primitives[K], F> }> = C
+/* eslint-disable */
+type PrimitiveFactoriesEnsurer<
+	F extends FlagStrings,
+	C extends { [K in keyof Primitives]: PrimitiveFactory<Primitives[K], F> },
+> = C
 type PrimitiveFactories<F extends FlagStrings> = PrimitiveFactoriesEnsurer<F, {
 	/**
 	 * Creates a number property descriptor, known to GObject as an int32, for use with `from` and `GClass`.
@@ -286,6 +298,8 @@ const make_object_factories = <F extends FlagStrings>(flag: F): ObjectFactories<
 		validate_value: (value, _spec) => value ?? null,
 	}),
 })
+
+/* eslint-enable */
 
 type PropFactories<F extends FlagStrings> = (F extends "const"
 	? PrimitiveFactories<F>

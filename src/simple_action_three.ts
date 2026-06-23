@@ -66,16 +66,18 @@ type ExtractActions<D> = {
 		? Key
 		: never
 	]: D[Key] extends ActionDescriptor<infer K, infer S, infer T, any>
-		? [K, S] extends ["prop", `property::${infer P}`]
-			? P extends keyof D
-				? D[P] extends PropDescriptor<infer PT, "readwrite">
-					? [PT] extends [string | boolean | number]
-						? TypedAction<"prop", S extends string ? S : never, PT>
-						: never
-					: never
-				: never
-			: TypedAction<K, S, T>
+		? TypedAction<K, S, T>
 		: never
+		// ? [K, S] extends ["prop", `property::${infer P}`]
+		// 	? P extends keyof D
+		// 		? D[P] extends PropDescriptor<infer PT, "readwrite">
+		// 			? [PT] extends [string | boolean | number]
+		// 				? TypedAction<"prop", S extends string ? S : never, PT>
+		// 				: never
+		// 			: never
+		// 		: never
+		// 	: TypedAction<K, S, T>
+		// : never
 }
 
 type ExtractActionDescriptors<D> = {
@@ -105,7 +107,7 @@ const make_param = <const S extends string>(
 	initial_state: undefined as any,
 	accels: config?.accels ?? [],
 	action_symbol: ACTION_SYMBOL,
-	create(name: string) {
+	create(name: string): any {
 		const action = new Gio.SimpleAction({ name, parameter_type: new GLib.VariantType(format) })
 		const instance = Object.assign(Object.create(this), {
 			action,
@@ -132,7 +134,7 @@ const make_state = <const S extends string, const Default extends HandleActionFo
 	initial_state,
 	accels: config?.accels ?? [],
 	action_symbol: ACTION_SYMBOL,
-	create(name: string) {
+	create(name: string): any {
 		const action = new Gio.SimpleAction({ name, state: new GLib.Variant(format, initial_state as any) })
 		const instance = Object.assign(Object.create(this), {
 			action,
@@ -161,14 +163,24 @@ const param = {
 		format: S,
 		config?: ActionConfig,
 	): Omit<ActionDescriptor<"param", S>, "as"> => make_param(format, config),
-}
+} as const
 
 const state = {
-	string: <const D extends string>(config?: StateActionConfig<D>) => make_state("s", (config?.default ?? "" as D), config),
-	bool: <const D extends boolean>(config?: StateActionConfig<D>) => make_state("b", (config?.default ?? false as D), config),
-	int32: <const D extends number>(config?: StateActionConfig<D>) => make_state("i", (config?.default ?? 0 as D), config),
-	uint32: <const D extends number>(config?: StateActionConfig<D>) => make_state("u", (config?.default ?? 0 as D), config),
-	double: <const D extends number>(config?: StateActionConfig<D>) => make_state("d", (config?.default ?? 0 as D), config),
+	string: <const D extends string>(
+		config?: StateActionConfig<D>,
+	) => make_state("s", (config?.default ?? "" as D), config),
+	bool: <const D extends boolean>(
+		config?: StateActionConfig<D>,
+	) => make_state("b", (config?.default ?? false as D), config),
+	int32: <const D extends number>(
+		config?: StateActionConfig<D>,
+	) => make_state("i", (config?.default ?? 0 as D), config),
+	uint32: <const D extends number>(
+		config?: StateActionConfig<D>,
+	) => make_state("u", (config?.default ?? 0 as D), config),
+	double: <const D extends number>(
+		config?: StateActionConfig<D>,
+	) => make_state("d", (config?.default ?? 0 as D), config),
 	variant: <const S extends string, const T extends HandleActionFormat<S>>(
 		format: S,
 		default_state: T,
@@ -183,7 +195,7 @@ const SimpleAction = {
 		initial_state: undefined,
 		accels: config?.accels ?? [],
 		action_symbol: ACTION_SYMBOL,
-		create(name: string) {
+		create(name: string): any {
 			const action = new Gio.SimpleAction({ name })
 			const instance = Object.assign(Object.create(this), {
 				action,
