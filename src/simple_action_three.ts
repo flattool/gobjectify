@@ -165,7 +165,7 @@ const state = {
 	): Omit<ActionDescriptor<"state", S, HandleActionFormat<S>, T>, "as"> => make_state(format, default_state, config),
 } as const
 
-const Action = {
+const SimpleAction = {
 	void: (config?: ActionConfig): ActionDescriptor<"void", undefined> => ({
 		kind: "void",
 		format: undefined,
@@ -191,5 +191,5 @@ const Action = {
 
 const is_action_descriptor = (item: any): item is ActionDescriptor<any, any> => item?.action_symbol === ACTION_SYMBOL
 
-export { Action, is_action_descriptor, resolve_action_prefix }
+export { SimpleAction, is_action_descriptor, resolve_action_prefix }
 export type { ActionKind, ActionDescriptor, TypedAction, ExtractActions, ExtractActionDescriptors, HandleActionFormat }

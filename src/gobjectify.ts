@@ -31,7 +31,7 @@ import {
 	type ExtractActionDescriptors,
 	type TypedAction,
 	is_action_descriptor,
-	Action,
+	SimpleAction,
 	resolve_action_prefix,
 } from "./simple_action_three.js"
 import { ConstMap } from "./const_map.js"
@@ -605,8 +605,9 @@ function OnSignal<T extends GObject.Object, S extends keyof SignalsOf<T>>(
 }
 
 // TODO: Document this!
+// TODO: Use $action_descriptors instead of key iteration
 function OnSimpleAction<
-	T extends Gtk.Widget,
+	T extends GObject.Object,
 	K extends {
 		[Key in keyof T]: Key extends "with_implements"
 		? never
@@ -626,9 +627,9 @@ function OnSimpleAction<
 		context.addInitializer(function (this: T): void {
 			const action = this[action_name] as Gio.SimpleAction | TypedAction<any, any>
 			if (action instanceof Gio.SimpleAction) {
-				action.connect("activate", target.bind(this))
+				action.connect("activate", (_action, ...rest) => (target as any).apply(this, rest))
 			} else {
-				action.connect(target.bind(this) as any)
+				action.connect((_action, ...rest) => (target as any).apply(this, rest))
 			}
 		})
 	}
@@ -939,6 +940,7 @@ GObject.Object.prototype.$connect_async = function (this: GObject.Object, resolv
 } as any
 
 // TODO: Document this!
+// TODO: Remove "with_implements" from the iterated keys, possible use $action_descriptors instead
 declare module "gi://Gtk?version=4.0" {
 	export namespace Gtk {
 		export interface Widget {
@@ -991,5 +993,5 @@ export {
 	PostInit,
 	Property,
 	Child,
-	Action,
+	SimpleAction,
 }
