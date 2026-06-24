@@ -1,7 +1,6 @@
 import GLib from "gi://GLib?version=2.0"
 import Gio from "gi://Gio?version=2.0"
 import Gtk from "gi://Gtk?version=4.0"
-import type { PropDescriptor } from "./property"
 
 // TODO: Document all of this!
 
@@ -10,9 +9,7 @@ const ACTION_SYMBOL = Symbol("Symbol for GObjectify SimpleAction descriptors")
 type ActionKind = "void" | "state" | "param"
 
 type HandleActionFormat<S extends string | undefined> = (S extends string
-	? S extends `property::${string}`
-		? any
-		: GLib.$ParseConstructorInput<S>
+	? GLib.$ParseConstructorInput<S>
 	: undefined
 )
 
@@ -21,7 +18,7 @@ type ActionNarrowable<
 	S extends (K extends "void" ? undefined : string),
 	T,
 	Default extends T,
-> = (K extends "void" | "prop" ? {} : K extends "param" ? {
+> = (K extends "void" ? {} : K extends "param" ? {
 	as<Narrow extends T>(): ActionDescriptor<K, S, Narrow, Narrow>,
 } : K extends "state" ? {
 	as<Narrow extends T>(): Default extends Narrow ? ActionDescriptor<K, S, Narrow, Default> : [never] & void,
@@ -35,7 +32,7 @@ type ActionDescriptor<
 > = {
 	readonly kind: K,
 	readonly format: S,
-	readonly initial_state: K extends "state" | "prop" ? Default : undefined,
+	readonly initial_state: K extends "state" ? Default : undefined,
 	readonly accels: string[],
 	readonly action_symbol: typeof ACTION_SYMBOL,
 	create(name: string): TypedAction<K, S, T>,
@@ -55,7 +52,7 @@ type TypedAction<
 } : K extends "param" ? {
 	activate(param: T): void,
 	connect(callback: (self: TypedAction<K, S, T>, param: T) => void): number,
-} : K extends "state" | "prop" ? {
+} : K extends "state" ? {
 	activate(new_state: T): void,
 	connect(callback: (self: TypedAction<K, S, T>, new_state: T) => void): number,
 	state: T,
@@ -68,16 +65,6 @@ type ExtractActions<D> = {
 	]: D[Key] extends ActionDescriptor<infer K, infer S, infer T, any>
 		? TypedAction<K, S, T>
 		: never
-		// ? [K, S] extends ["prop", `property::${infer P}`]
-		// 	? P extends keyof D
-		// 		? D[P] extends PropDescriptor<infer PT, "readwrite">
-		// 			? [PT] extends [string | boolean | number]
-		// 				? TypedAction<"prop", S extends string ? S : never, PT>
-		// 				: never
-		// 			: never
-		// 		: never
-		// 	: TypedAction<K, S, T>
-		// : never
 }
 
 type ExtractActionDescriptors<D> = {
