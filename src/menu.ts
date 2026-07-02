@@ -5,6 +5,8 @@ import GObject from "gi://GObject?version=2.0"
 import { resolve_action_prefix } from "./simple_action_four.js"
 import type { TypedAction, ActionKind, StaticActionDescriptor } from "./simple_action_four.js"
 
+// TODO: Support PropActions
+
 type GClass = abstract new (...args: any[]) => GObject.Object
 
 type ActionsOf<G extends GClass, Kinds extends ActionKind = ActionKind> = {
@@ -147,10 +149,134 @@ function build(...items: MenuItemOrItems): Gio.Menu {
 }
 
 export const Menu = {
+	/**
+	 * Assembles a top-level `Gio.Menu` from `Gio.MenuItem`s, sections, and submenus.
+	 *
+	 * Accepts any mix of individual `Gio.MenuItem`s and/or arrays of them
+	 * (for example, the result of `item_group` or `items_for`).
+	 *
+	 * The resulting `Gio.Menu` can be attached anywhere a `Gio.MenuModel` is expected,
+	 * such as a `Gtk.Popover`'s `menu_model` property.
+	 *
+	 * @param items A mix of menu items and arrays of menu items to include in the resulting menu.
+	 *
+	 * @example
+	 * ```ts
+	 * const menu = Menu.build(
+	 *     Menu.item(MainWindow, "quit", "Quit"),
+	 *     Menu.submenu(
+	 *         "Edit",
+	 *         Menu.item(MainWindow, "save_changes", "Save"),
+	 *     ),
+	 *     Menu.section(
+	 *         "Theme",
+	 *         Menu.item_group(MainWindow, "set-theme",
+	 *             { label: "Light", target: "light" },
+	 *             { label: "Dark", target: "dark" },
+	 *         ),
+	 *     ),
+	 * )
+	 * ```
+	 */
 	build,
+	/**
+	 * Groups items into a labeled (or unlabled) `Gio.MenuItem` section.
+	 *
+	 * Accepts any mix of individual `Gio.MenuItem`s and/or arrays of them
+	 * (for example, the result of `item_group` or `items_for`).
+	 *
+	 * @param label The submenu's label, or `null` for an unlabled submenu.
+	 * @param items A mix of menu items and arrays of menu items to include in the resulting section.
+	 *
+	 * @example
+	 * ```ts
+	 * Menu.section("Edit",
+	 *     Menu.item(MainWindow, "save-changes", "Save"),
+	 *     Menu.item(MainWindow, "discard-changes", "Discard"),
+	 * )
+	 * ```
+	 */
 	section,
+	/**
+	 * Groups items into a labeled (or unlabled) nested `Gio.MenuItem` submenu.
+	 *
+	 * Accepts any mix of individual `Gio.MenuItem`s and/or arrays of them
+	 * (for example, the result of `item_group` or `items_for`).
+	 *
+	 * @param label The submenu's label, or `null` for an unlabled submenu.
+	 * @param items A mix of menu items and arrays of menu items to include in the resulting submenu.
+	 *
+	 * @example
+	 * ```ts
+	 * Menu.submenu("Theme",
+	 *     Menu.item_group(MainWindow, "set-theme",
+	 *         { label: "Light", target: "light" },
+	 *         { label: "Dark", target: "dark" },
+	 *     ),
+	 * )
+	 * ```
+	 */
 	submenu,
+	/**
+	 * Creates a single `Gio.MenuItem` targeting one action declared on a `GClass`-decorated class.
+	 *
+	 * For `void` actions, `config` may be a plain string, used directly as the item's label.
+	 * For `param` and `state` actions, `config` must include a `target` value, typed to match
+	 * that action's parameter/state type.
+	 *
+	 * @param klass The class the action belongs to.
+	 * @param key The name of the action field on `klass`.
+	 * @param config The item's label/icon/etc, and a `target` value for `param`/`state` actions.
+	 *
+	 * @example
+	 * ```ts
+	 * Menu.item(MainWindow, "undo", "Undo")
+	 * Menu.item(MainWindow, "save_changes", { label: "Save", icon: "document-save-symbolic" })
+	 * Menu.item(MainWindow, "set_theme", { label: "Dark", target: "dark" })
+	 * ```
+	 */
 	item,
+	/**
+	 * Creates several `Gio.MenuItem`s that all target the same `state` action with different `target` values.
+	 * This achieves the standard pattern for radio-style menu selections, where activating any item sets the
+	 * shared action's state.
+	 *
+	 * Only keys pointing to `state`-kind actions on `klass` are accepted.
+	 *
+	 * @param klass The class the action belongs to.
+	 * @param key The key of the `state` action on `klass`.
+	 *
+	 * @example
+	 * ```ts
+	 * Menu.item_group(MainWindow, "sort_order",
+	 *     { label: "Name", target: "name" },
+	 *     { label: "Date", target: "date-created" },
+	 *     { label: "Size", target: "size" },
+	 * )
+	 * ```
+	 */
 	item_group,
+	/**
+	 * Bulk-creates `Gio.MenuItem`s that all target a single class's actions.
+	 *
+	 * @param klass The class the actions belong to.
+	 * @param input Partial record that maps action names to their menu item config(s).
+	 *
+	 * The item configs accepted in `input`s values are specific.
+	 * `void` actions may be a simple string for a label, but `param` and `state` actions require
+	 * an object that includes `label` and `target`. `state` actions may also receive an array of config objects,
+	 * which allows specifying item groups for things like radio menus (see `item_group` for more info).
+	 *
+	 * @example
+	 * ```ts
+	 * Menu.items_for(MainWindow, {
+	 *     save_changes: "Save",                      // void action
+	 *     set_theme: [                               // state<string> action
+	 *         { label: "Light", target: "light" },
+	 *         { label: "Dark", target: "dark" },
+	 *     ],
+	 *     load: { label: "Reload", target: "base" }, // param<string> action
+	 * })
+	 */
 	items_for,
 } as const
