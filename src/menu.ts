@@ -1,35 +1,29 @@
 import GLib from "gi://GLib?version=2.0"
 import Gio from "gi://Gio?version=2.0"
-import Gtk from "gi://Gtk?version=4.0"
+import GObject from "gi://GObject?version=2.0"
 
-import type { TypedAction, ActionKind, ActionDescriptor } from "./simple_action_three.js"
-import { resolve_action_prefix } from "./simple_action_three.js"
+import { resolve_action_prefix } from "./simple_action_four.js"
+import type { TypedAction, ActionKind, StaticActionDescriptor } from "./simple_action_four.js"
 
-// TODO: Use $action_descriptors as source of truth for actions instead of ActionsOf
+type GClass = abstract new (...args: any[]) => GObject.Object
 
-type WidgetClass = (
-	abstract new (...args: any[]) => Gtk.Widget
-) & {
-	readonly $action_descriptors: Record<string, ActionDescriptor<any, any, any, any>>,
-}
-
-type ActionsOf<G extends WidgetClass, Kinds extends ActionKind = ActionKind> = {
+type ActionsOf<G extends GClass, Kinds extends ActionKind = ActionKind> = {
 	[Key in keyof InstanceType<G> as Key extends "with_implements"
 		? never
-		: InstanceType<G>[Key] extends TypedAction<infer Kind, any, any>
+		: InstanceType<G>[Key] extends TypedAction<infer Kind, any>
 			? Kind extends Kinds
 				? Key
 				: never
 			: never
-	]: InstanceType<G>[Key] extends TypedAction<any, any, any>
+	]: InstanceType<G>[Key] extends TypedAction<any, any>
 		? InstanceType<G>[Key]
 		: never
 }
-type ParamStateTypeOf<D extends ActionDescriptor<any, any, any, any>> = (
-	D extends ActionDescriptor<any, any, infer T, any> ? T : never
+type ParamStateTypeOf<D extends TypedAction<any, any>> = (
+	D extends TypedAction<any, infer T> ? T : never
 )
-type KindOf<D extends ActionDescriptor<any, any, any, any>> = (
-	D extends ActionDescriptor<infer Kind, any, any, any> ? Kind : never
+type KindOf<D extends TypedAction<any, any>> = (
+	D extends TypedAction<infer Kind, any> ? Kind : never
 )
 
 type MenuItemConfig = {
@@ -69,36 +63,36 @@ function initialize_menu_item(
 }
 
 function item<
-	G extends WidgetClass,
+	G extends GClass,
 	K extends keyof ActionsOf<G>,
 >(
 	klass: G,
 	key: K,
 	config: MenuItemInput<ParamStateTypeOf<ActionsOf<G>[K]>, KindOf<ActionsOf<G>[K]>>,
 ): Gio.MenuItem {
-	const descriptor: ActionDescriptor<any, any> = (klass as any).$action_descriptors[key]
+	const static_desc: StaticActionDescriptor<any, any, any> = (klass as any).$action[key]
 	const detailed_action = `${resolve_action_prefix(klass)}.${String(key)}`
 	return initialize_menu_item(
 		detailed_action,
 		typeof config === "string" ? { label: config } : config,
-		descriptor.format,
+		static_desc.descriptor.format,
 	)
 }
 
 function item_group<
-	G extends WidgetClass,
+	G extends GClass,
 	K extends keyof ActionsOf<G, "state">,
 >(
 	klass: G,
 	key: K,
 	...configs: GroupedItemInput<ParamStateTypeOf<ActionsOf<G, "state">[K]>>
 ): Gio.MenuItem[] {
-	const descriptor: ActionDescriptor<any, any> = (klass as any).$action_descriptors[key]
+	const static_desc: StaticActionDescriptor<any, any, any> = (klass as any).$action[key]
 	const detailed_action = `${resolve_action_prefix(klass)}.${String(key)}`
-	return configs.map((config) => initialize_menu_item(detailed_action, config, descriptor.format))
+	return configs.map((config) => initialize_menu_item(detailed_action, config, static_desc.descriptor.format))
 }
 
-type ItemsForInput<G extends WidgetClass> = {
+type ItemsForInput<G extends GClass> = {
 	[Key in keyof ActionsOf<G>]?: (ActionsOf<G>[Key]["kind"] extends "state"
 		? (
 			| MenuItemInput<ParamStateTypeOf<ActionsOf<G>[Key]>, "state">
@@ -107,7 +101,7 @@ type ItemsForInput<G extends WidgetClass> = {
 	)
 }
 
-function items_for<G extends WidgetClass>(
+function items_for<G extends GClass>(
 	klass: G,
 	input: ItemsForInput<G>,
 ): Gio.MenuItem[] {

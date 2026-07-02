@@ -34,7 +34,8 @@ import {
 	is_action_descriptor,
 	SimpleAction,
 	resolve_action_prefix,
-} from "./simple_action_three.js"
+	make_static_descriptor,
+} from "./simple_action_four.js"
 import { ConstMap } from "./const_map.js"
 import GLib from "gi://GLib?version=2.0"
 
@@ -44,14 +45,14 @@ type Finalize<D> = {
 	[K in keyof D]: Final<D[K]>
 }
 
-// type PropsAllowedForPropAction<D> = keyof {
-// 	[Key in keyof D as D[Key] extends PropDescriptor<infer T, infer F>
-// 		? [T, F] extends [number | boolean | string, "readwrite"]
-// 			? Key
-// 			: never
-// 		: never
-// 	]: Key
-// }
+type PropsAllowedForPropAction<D> = keyof {
+	[Key in keyof D as D[Key] extends PropDescriptor<infer T, infer F>
+		? [T, F] extends [number | boolean | string, "readwrite"]
+			? Key
+			: never
+		: never
+	]: Key
+}
 
 type Descriptor<D, T extends GObject.Object> = {
 	[Key in keyof D as Key extends string
@@ -64,10 +65,13 @@ type Descriptor<D, T extends GObject.Object> = {
 			: Key extends keyof T["$signals"]
 				? PropDescriptor<any, any>
 				: PropDescriptor<any, any> | SignalDescriptor<any[], any>
-	) | (T extends Gtk.Application | Gtk.ApplicationWindow | Gtk.Widget
-		? ActionDescriptor<any, any, any, any>
-		: never
-	)
+		) | (T extends Gtk.Application | Gtk.ApplicationWindow | Gtk.Widget
+			? (
+				ActionDescriptor<"param" | "state" | "void", any, any>
+				| ActionDescriptor<"prop", `property::${PropsAllowedForPropAction<D>}`, any>
+			)
+			: never
+		)
 }
 
 type GClassFor<T extends GObject.Object> = new (...args: any[]) => T
@@ -95,7 +99,7 @@ type ResultingClass<
 > = {
 	readonly $gtype: GObject.GType<InstanceType<T> & { readonly $unique: unique symbol }>,
 	readonly $params: ResultingConstructorParamsObj<T, D>[0],
-	readonly $action_descriptors: ExtractActionDescriptors<D>,
+	readonly $actions: ExtractActionDescriptors<D>,
 } & (abstract new (...args: ResultingConstructorParamsObj<T, D>) => (
 	SignalOverrides<InstanceType<T>, D>
 	& InstanceType<T>
@@ -301,7 +305,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 		const property_descriptors: Record<string, PropDescriptor<any, any>> = {}
 		const children: string[] = []
 		const action_prefix = resolve_action_prefix(target)
-		const actions = new Map<string, ActionDescriptor<any, any, any, any>>()
+		const actions = new Map<string, ActionDescriptor<any, any, any>>()
 		const signals: Record<string, RegisterableSignal> = {}
 		let implement: (AbstractGClassFor<GObject.Object> & { $gtype: GObject.GType })[] = []
 
@@ -359,6 +363,7 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				} else if (is_child_descriptor(value)) {
 					children.push(name.replace("_", ""))
 				} else if (is_action_descriptor(value)) {
+					print("is action!", name)
 					/* eslint-disable */
 					if (
 						value.accels.length > 0
@@ -379,7 +384,10 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 			Object.setPrototypeOf(target, maybe_metadata.extend)
 		}
 
-		(target as any).$action_descriptors = Object.fromEntries(actions)
+		(target as any).$actions = {}
+		for (const [key, val] of actions) {
+			(target as any).$actions[key] = make_static_descriptor(action_prefix, key, val)
+		}
 
 		for (const [name, spec] of Object.entries(options?.manual_properties ?? {})) {
 			if (properties[name]) {
@@ -416,9 +424,9 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 
 				if (action_addable !== undefined) {
 					for (const [name, value] of actions.entries()) {
-						const typed_action = value.create(name)
+						const typed_action = value.create(action_prefix, name, this)
 						action_addable.add_action(typed_action.action)
-						accel_setter?.(`${action_prefix}.${name}`, value.accels)
+						accel_setter?.(typed_action.detailed_name, value.accels as string[])
 						this[name] = typed_action
 					}
 				}
@@ -616,32 +624,37 @@ function OnSignal<T extends GObject.Object, S extends keyof SignalsOf<T>>(
 	})
 }
 
+type ActionsOf<O extends GObject.Object, K extends ActionKind> = {
+	[Key in keyof O as O[Key] extends TypedAction<K, any>
+		? Key
+		: never
+	]: O[Key]
+}
+
+type CallbackForAction<O, A> = (
+	A extends TypedAction<"state" | "param", infer T>
+		? (this: O, param_or_state: T) => any
+		: A extends TypedAction<"void", any>
+			? (this: O) => any
+			: never
+)
+
 // TODO: Document this!
-// TODO: Use $action_descriptors instead of key iteration
 function OnSimpleAction<
 	T extends GObject.Object,
-	K extends {
-		[Key in keyof T]: Key extends "with_implements"
-			? never
-			: T[Key] extends Gio.SimpleAction | TypedAction<any, any, any>
-				? Key
-				: never
-	}[keyof T],
-	U extends T[K] extends Gio.SimpleAction
-		? (this: T, variant: GLib.Variant) => any
-		: T[K] extends TypedAction<infer Kind, any, infer N>
-			? Kind extends "param" | "state"
-				? (this: T, param_state: N) => any
-				: (this: T) => any
-			: never,
+	K extends keyof ActionsOf<T, Exclude<ActionKind, "prop">>,
+	U extends CallbackForAction<T, T[K]>,
 >(action_name: K) {
-	return function (target: U, context: ClassMethodDecoratorContext<T>): void {
+	return (target: U, context: ClassMethodDecoratorContext<T>): void => {
 		context.addInitializer(function (this: T): void {
-			const action = this[action_name] as Gio.SimpleAction | TypedAction<any, any, any>
-			if (action instanceof Gio.SimpleAction) {
-				action.connect("activate", (_action, ...rest) => (target as any).apply(this, rest))
-			} else {
-				action.connect((_action, ...rest) => (target as any).apply(this, rest))
+			const action = this[action_name] as TypedAction<ActionKind, any>
+			if (action.kind === "state") {
+				(action as TypedAction<"state", any>).on_state_changed((_a, state) => target.call(this, state))
+			} else if (action.kind === "param") {
+				(action as TypedAction<"param", any>).on_activated((_a, param) => target.call(this, param))
+			} else if (action.kind === "void") {
+				// @ts-expect-error
+				(action as TypedAction<"void", null>).on_activated(() => target.call(this))
 			}
 		})
 	}
@@ -956,44 +969,6 @@ GObject.Object.prototype.$connect_async = function (
 			reject(new Error(`Rejection signal: '${String(reject_signal)}' triggered with args: ${args}`))
 		})
 	})
-} as any
-
-// TODO: Document this!
-// TODO: Remove "with_implements" from the iterated keys, possible use $action_descriptors instead
-declare module "gi://Gtk?version=4.0" {
-	export namespace Gtk {
-		export interface Widget {
-			$activate_action<
-				C extends abstract new (...args: any[]) => Gtk.Widget,
-				N extends {
-					[K in keyof InstanceType<C>]: InstanceType<C>[K] extends TypedAction<any, any, any> ? K : never
-				}[keyof InstanceType<C>],
-			>(
-				klass: C,
-				name: N,
-				...param: InstanceType<C>[N] extends TypedAction<"void", any, any>
-					? []
-					: InstanceType<C>[N] extends TypedAction<any, any, infer T>
-						? [value: T]
-						: []
-			): void
-		}
-	}
-}
-
-Gtk.Widget.prototype.$activate_action = function (
-	this: Gtk.Widget,
-	klass: any,
-	name: string,
-	...params: any[]
-): void {
-	const descriptor: ActionDescriptor<any, any, any, any> | undefined = klass.$action_descriptors?.[name]
-	const detailed_action = `${resolve_action_prefix(klass)}.${name}`
-	if (descriptor?.format && params.length > 0) {
-		this.activate_action(detailed_action, new GLib.Variant(descriptor.format, params[0]))
-	} else {
-		this.activate_action(detailed_action, null)
-	}
 } as any
 
 export {
