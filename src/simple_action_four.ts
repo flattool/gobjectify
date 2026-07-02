@@ -5,6 +5,8 @@ import Gtk from "gi://Gtk?version=4.0"
 import type { PropDescriptor } from "./property.js"
 import GObject from "gi://GObject?version=2.0"
 
+// TODO: Support PropActions
+
 const ACTION_SYMBOL = Symbol("Symbol for GObjectify SimpleAction descriptors")
 
 type ActionKind = "void" | "param" | "state" | "prop"
