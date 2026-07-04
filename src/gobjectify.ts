@@ -1,4 +1,5 @@
 import GObject from "gi://GObject?version=2.0"
+import GLib from "gi://GLib?version=2.0"
 import Gio from "gi://Gio?version=2.0"
 import Gtk from "gi://Gtk?version=4.0"
 
@@ -36,8 +37,8 @@ import {
 	resolve_action_prefix,
 	make_static_descriptor,
 } from "./simple_action_four.js"
+import { Menu } from "./menu.js"
 import { ConstMap } from "./const_map.js"
-import GLib from "gi://GLib?version=2.0"
 
 declare const no_override: unique symbol
 type Final<T> = T & typeof no_override
@@ -68,7 +69,7 @@ type Descriptor<D, T extends GObject.Object> = {
 		) | (T extends Gtk.Application | Gtk.ApplicationWindow | Gtk.Widget
 			? (
 				ActionDescriptor<"param" | "state" | "void", any, any>
-				| ActionDescriptor<"prop", `property::${PropsAllowedForPropAction<D>}`, any>
+				| ActionDescriptor<"prop", any, `property::${PropsAllowedForPropAction<D>}`>
 			)
 			: never
 		)
@@ -363,7 +364,6 @@ function GClass<T extends GObject.Object>(options?: ClassDecoratorParams) {
 				} else if (is_child_descriptor(value)) {
 					children.push(name.replace("_", ""))
 				} else if (is_action_descriptor(value)) {
-					print("is action!", name)
 					/* eslint-disable */
 					if (
 						value.accels.length > 0
@@ -639,7 +639,16 @@ type CallbackForAction<O, A> = (
 			: never
 )
 
-// TODO: Document this!
+/**
+ * Decorator that connects a method to a GObjectify SimpleAction event.
+ *
+ * When applied to a class method, the `OnSimpleAction(action_name)` ensures that the method
+ * is automatically connected to the given action on the class. The decorated method is bound
+ * to the instance, so `this` always refers to the object that captures the action.
+ *
+ * @param action_name The name of the GObjectify SimpleAction to connect to.
+ * @returns A decorator for instance methods.
+ */
 function OnSimpleAction<
 	T extends GObject.Object,
 	K extends keyof ActionsOf<T, Exclude<ActionKind, "prop">>,
@@ -659,37 +668,6 @@ function OnSimpleAction<
 		})
 	}
 }
-
-/**
- * Decorator that connects a method to a Gio simple action's event signal.
- *
- * This decorator expects a string for the name of the action, but this string is limited to action fields defined on
- * the instance type in the method's class. See `from` for info on how to easily add Simple Actions to
- * GObject subclasses.
- *
- * @param action_name - Name of the field containing a GioSimpleAction to connect to.
- */
-// function OnSimpleAction<
-// 	T extends GObject.Object,
-// 	K extends {
-// 		[Key in keyof T]: Key extends "with_implements"
-// 		? never
-// 		: T[Key] extends Gio.SimpleAction
-// 		? Key
-// 		: never
-// 	}[keyof T],
-// 	U extends (
-// 		| ((this: T) => any)
-// 		| ((this: T, action: Gio.SimpleAction) => any)
-// 		| ((this: T, action: Gio.SimpleAction, value: GLib.Variant) => any)
-// 	),
-// >(action_name: K) {
-// 	return function (target: U, context: ClassMethodDecoratorContext<T>): void {
-// 		context.addInitializer(function (this: T): void {
-// 			(this[action_name] as Gio.SimpleAction).connect("activate", target.bind(this))
-// 		})
-// 	}
-// }
 
 /**
  * Decorator that connects a method to one or more GObject property change notifications.
@@ -988,4 +966,5 @@ export {
 	Property,
 	Child,
 	SimpleAction,
+	Menu,
 }

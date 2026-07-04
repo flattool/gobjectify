@@ -2,10 +2,8 @@ import GLib from "gi://GLib?version=2.0"
 import Gio from "gi://Gio?version=2.0"
 import Gtk from "gi://Gtk?version=4.0"
 
-import type { PropDescriptor } from "./property.js"
+import { Property, type PropDescriptor } from "./property.js"
 import GObject from "gi://GObject?version=2.0"
-
-// TODO: Support PropActions
 
 const ACTION_SYMBOL = Symbol("Symbol for GObjectify SimpleAction descriptors")
 
@@ -22,20 +20,21 @@ type StateActionConfig<T> = ActionConfig & { default?: T }
 type ActionDescriptor<K extends ActionKind, T, Default> = {
 	readonly kind: K,
 	readonly format: string,
-	readonly initial_state: K extends "state" | "prop" ? Default : undefined,
+	readonly initial_state: K extends "state" ? Default : undefined,
 	readonly accels: readonly string[],
 	readonly action_symbol: typeof ACTION_SYMBOL,
 	readonly __$t_holder?: T,
 	create(prefix: string, name: string, obj: GObject.Object): TypedAction<K, T>,
-}
+} & (K extends "prop" ? {
+	transformer(item: T): GLib.Variant,
+} : {})
 
 type ActionNarrowable<K extends ActionKind, T, Default> = (
-	K extends "void" | "prop" ? {
-	} : K extends "param" ? {
+	K extends "param" ? {
 		as<Narrow extends T>(): ActionDescriptor<K, Narrow, Narrow>,
 	} : K extends "state" ? {
 		as<Narrow extends T>(): [Default] extends [Narrow] ? ActionDescriptor<K, Narrow, Default> : [never] & void,
-	} : never
+	} : {}
 )
 
 type NarrowableActionDescriptor<K extends ActionKind, T, Default> = (
@@ -47,40 +46,42 @@ type MethodsFieldsForKind<K extends ActionKind, T> = (
 	K extends "void" ? {
 		activate(): void,
 		on_activated(callback: (self: TypedAction<K, T>) => void): number,
+		enabled: boolean,
 	} : K extends "param" ? {
 		activate(param: T): void,
 		on_activated(callback: (self: TypedAction<K, T>, param: T) => void): number,
+		enabled: boolean,
 	} : K extends "state" ? {
 		activate(new_state: T): void,
 		on_state_changed(callback: (self: TypedAction<K, T>, new_state: T) => void): number,
 		state: T,
+		enabled: boolean,
 	} : K extends "prop" ? {
+		activate(new_state: T): void,
+		readonly enabled: boolean,
 	} : never
 )
 
 type TypedActionBase<K extends ActionKind, T> = {
 	readonly action: K extends "prop" ? Gio.PropertyAction : Gio.SimpleAction,
 	readonly detailed_name: string,
-} & (
-	K extends "prop" ? { readonly enabled: boolean } : { enabled: boolean }
-) & MethodsFieldsForKind<K, T>
+} & MethodsFieldsForKind<K, T>
 
 type TypedAction<K extends ActionKind, T> = Omit<
 	ActionDescriptor<K, T, T>,
 	"create" | "initial_state" | "action_symbol" | "__$t_holder"
 > & TypedActionBase<K, T>
 
-type StaticActionDescriptor<K extends ActionKind, T, Default> = {
+type StaticActionDescriptor<K extends ActionKind, T, Default> = Omit<
+	ActionDescriptor<K, T, Default>,
+	"create" | "initial_state" | "action_symbol" | "__$t_holder"
+> & {
 	readonly detailed_name: string,
-	readonly descriptor: Omit<
-		ActionDescriptor<K, T, Default>,
-		"create" | "initial_state" | "action_symbol" | "__$t_holder"
-	>,
 } & (K extends "void" ? {
 	activate(origin: GObject.Object): boolean,
 } : K extends "param" ? {
 	activate(origin: GObject.Object, param: T): boolean,
-} : K extends "state" ? {
+} : K extends "state" | "prop" ? {
 	activate(origin: GObject.Object, new_state: T): boolean,
 } : {})
 
@@ -97,9 +98,9 @@ type ExtractActions<D> = {
 	readonly [Key in keyof D as D[Key] extends ActionDescriptor<any, any, any>
 		? Key
 		: never
-	]: D[Key] extends ActionDescriptor<infer K, infer T, any>
-		? Key extends "prop"
-			? T extends `property::${infer F}`
+	]: D[Key] extends ActionDescriptor<infer K, infer T, infer Default>
+		? K extends "prop"
+			? Default extends `property::${infer F}`
 				? F extends keyof D
 					? D[F] extends PropDescriptor<infer PT, any>
 						? TypedAction<K, PT>
@@ -110,20 +111,31 @@ type ExtractActions<D> = {
 		: never
 }
 
+const make_activate_for_descriptor = (
+	detailed_name: string,
+	descriptor: ActionDescriptor<ActionKind, any, any>,
+): (origin: Gtk.Widget, param?: any) => boolean => {
+	if (descriptor.kind === "prop") {
+		return (origin, param) => origin.activate_action(
+			detailed_name,
+			(descriptor as ActionDescriptor<"prop", any, any>).transformer(param),
+		)
+	} else if (descriptor.kind === "void") {
+		return (origin) => origin.activate_action(detailed_name, null)
+	} else {
+		return (origin, param) => origin.activate_action(detailed_name, new GLib.Variant(descriptor.format, param))
+	}
+}
+
 const make_static_descriptor = <K extends ActionKind, T, Default>(
 	prefix: string,
 	name: string,
 	descriptor: ActionDescriptor<K, T, Default>,
-): StaticActionDescriptor<K, T, Default> => ({
-	descriptor,
-	detailed_name: `${prefix}.${name}`,
-	activate(origin: Gtk.Widget, param?: any): boolean {
-		return origin.activate_action(
-			this.detailed_name,
-			descriptor.kind === "void" ? null : new GLib.Variant(descriptor.format, param),
-		)
-	},
-} satisfies StaticActionDescriptor<any, T, Default> as any)
+): StaticActionDescriptor<K, T, Default> => {
+	const detailed_name = `${prefix}.${name}`
+	const activate = make_activate_for_descriptor(detailed_name, descriptor)
+	return { ...descriptor, detailed_name, activate } satisfies StaticActionDescriptor<any, T, Default> as any
+}
 
 const resolve_action_prefix = (
 	item: (abstract new (...args: any[]) => GObject.Object) | GObject.Object,
@@ -254,20 +266,23 @@ const SimpleAction = {
 			config?: ActionConfig,
 		): Omit<ActionDescriptor<"state", HandleActionFormat<S>, T>, "as"> => make_state(format, default_state, config),
 	},
-	property: <const Field extends string>(
+	property: <const Field extends string, S extends string, T extends HandleActionFormat<S>>(
 		field: Field,
+		transformer: (item: T) => GLib.Variant<S>,
 		config?: ActionConfig,
-	): ActionDescriptor<"prop", `property::${Field}`, any> => ({
+	): ActionDescriptor<"prop", T, `property::${Field}`> => ({
 		kind: "prop",
 		format: "",
 		accels: config?.accels ?? [],
 		action_symbol: ACTION_SYMBOL,
 		initial_state: undefined,
+		transformer: transformer as any,
 		create(prefix, name, object): TypedAction<"prop", any> {
 			const action = new Gio.PropertyAction({ name, object, property_name: field })
 			const instance = Object.assign(Object.create(this), {
 				action,
 				detailed_name: `${prefix}.${name}`,
+				activate: (item): void => action.activate(transformer(item)),
 				get enabled(): boolean { return action.get_enabled() },
 			} satisfies TypedActionBase<"prop", any>)
 			return instance

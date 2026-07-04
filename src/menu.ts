@@ -2,10 +2,7 @@ import GLib from "gi://GLib?version=2.0"
 import Gio from "gi://Gio?version=2.0"
 import GObject from "gi://GObject?version=2.0"
 
-import { resolve_action_prefix } from "./simple_action_four.js"
 import type { TypedAction, ActionKind, StaticActionDescriptor } from "./simple_action_four.js"
-
-// TODO: Support PropActions
 
 type GClass = abstract new (...args: any[]) => GObject.Object
 
@@ -43,15 +40,19 @@ type MenuItemInput<T, K extends ActionKind> = (K extends "void"
 type GroupedItemInput<T> = MenuItemConfigTarget<T>[]
 
 function initialize_menu_item(
-	detailed_action: string,
+	detailed_name: string,
 	config: MenuItemConfig | MenuItemConfigTarget<unknown>,
-	format: string | undefined,
+	state_helper: string | ((item: any) => GLib.Variant) | undefined,
 ): Gio.MenuItem {
 	const item = new Gio.MenuItem()
 	item.set_label(config.label)
-	item.set_detailed_action(detailed_action)
-	if ("target" in config && format) {
-		item.set_attribute_value("target", new GLib.Variant(format, config.target))
+	item.set_detailed_action(detailed_name)
+	if ("target" in config) {
+		if (typeof state_helper === "string") {
+			item.set_attribute_value("target", new GLib.Variant(state_helper, config.target))
+		} else if (typeof state_helper === "function") {
+			item.set_attribute_value("target", state_helper(config.target))
+		}
 	}
 	if (typeof config.icon === "string") {
 		item.set_icon(Gio.Icon.new_for_string(config.icon))
@@ -72,26 +73,36 @@ function item<
 	key: K,
 	config: MenuItemInput<ParamStateTypeOf<ActionsOf<G>[K]>, KindOf<ActionsOf<G>[K]>>,
 ): Gio.MenuItem {
-	const static_desc: StaticActionDescriptor<any, any, any> = (klass as any).$action[key]
-	const detailed_action = `${resolve_action_prefix(klass)}.${String(key)}`
+	const static_desc: StaticActionDescriptor<ActionKind, any, any> = (klass as any).$actions[key]
+	const state_helper = (static_desc.kind === "prop"
+		? (static_desc as StaticActionDescriptor<"prop", any, any>).transformer
+		: static_desc.format
+	)
 	return initialize_menu_item(
-		detailed_action,
+		static_desc.detailed_name,
 		typeof config === "string" ? { label: config } : config,
-		static_desc.descriptor.format,
+		state_helper,
 	)
 }
 
 function item_group<
 	G extends GClass,
-	K extends keyof ActionsOf<G, "state">,
+	K extends keyof ActionsOf<G, "state" | "prop">,
 >(
 	klass: G,
 	key: K,
-	...configs: GroupedItemInput<ParamStateTypeOf<ActionsOf<G, "state">[K]>>
+	...configs: GroupedItemInput<ParamStateTypeOf<ActionsOf<G, "state" | "prop">[K]>>
 ): Gio.MenuItem[] {
-	const static_desc: StaticActionDescriptor<any, any, any> = (klass as any).$action[key]
-	const detailed_action = `${resolve_action_prefix(klass)}.${String(key)}`
-	return configs.map((config) => initialize_menu_item(detailed_action, config, static_desc.descriptor.format))
+	const static_desc: StaticActionDescriptor<"state" | "prop", any, any> = (klass as any).$actions[key]
+	const state_helper = (static_desc.kind === "prop"
+		? (static_desc as StaticActionDescriptor<"prop", any, any>).transformer
+		: static_desc.format
+	)
+	return configs.map((config) => initialize_menu_item(
+		static_desc.detailed_name,
+		config,
+		state_helper,
+	))
 }
 
 type ItemsForInput<G extends GClass> = {
