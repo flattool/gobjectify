@@ -2,7 +2,7 @@ import GLib from "gi://GLib?version=2.0"
 import Gio from "gi://Gio?version=2.0"
 import GObject from "gi://GObject?version=2.0"
 
-import type { TypedAction, ActionKind, StaticActionDescriptor } from "./simple_action_four.js"
+import type { TypedAction, ActionKind, StaticActionDescriptor } from "./simple_action.js"
 
 type GClass = abstract new (...args: any[]) => GObject.Object
 

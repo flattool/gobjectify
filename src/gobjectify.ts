@@ -36,7 +36,7 @@ import {
 	SimpleAction,
 	resolve_action_prefix,
 	make_static_descriptor,
-} from "./simple_action_four.js"
+} from "./simple_action.js"
 import { Menu } from "./menu.js"
 import { ConstMap } from "./const_map.js"
 
