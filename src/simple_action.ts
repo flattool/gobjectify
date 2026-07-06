@@ -2,10 +2,10 @@ import GLib from "gi://GLib?version=2.0"
 import Gio from "gi://Gio?version=2.0"
 import Gtk from "gi://Gtk?version=4.0"
 
-import { Property, type PropDescriptor } from "./property.js"
+import { type PropDescriptor } from "./property.js"
 import GObject from "gi://GObject?version=2.0"
 
-const ACTION_SYMBOL = Symbol("Symbol for GObjectify SimpleAction descriptors")
+const ACTION_SYMBOL = Symbol("Symbol for GObjectify SimplerAction descriptors")
 
 type ActionKind = "void" | "param" | "state" | "prop"
 
@@ -210,14 +210,14 @@ const make_state = <const S extends string, const Default extends HandleActionFo
 	as(): any { return this },
 })
 
-const SimpleAction = {
+const SimplerAction = {
 	/**
 	 * Creates an **ActionDescriptor** for use with `from()` and `GClass`,
 	 * describing a GioSimpleAction with no state and no parameter.
 	 *
 	 * `from()` and `GClass` will see this descriptor and connect up the action to the instance on instantiation.
 	 *
-	 * @param config Optional parameters for the SimpleAction.
+	 * @param config Optional parameters for the SimplerAction.
 	 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 	 */
 	void: (config?: ActionConfig): ActionDescriptor<"void", null, null> => ({
@@ -247,50 +247,50 @@ const SimpleAction = {
 	 */
 	param: {
 		/**
-		 * Creates a SimpleAction descriptor with a string parameter.
+		 * Creates a SimplerAction descriptor with a string parameter.
 		 *
-		 * @param config Optional parameters for the SimpleAction.
+		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
 		string: (config?: ActionConfig) => make_param("s", config),
 		/**
-		 * Creates a SimpleAction descriptor with a boolean parameter.
+		 * Creates a SimplerAction descriptor with a boolean parameter.
 		 *
-		 * @param config Optional parameters for the SimpleAction.
+		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
 		bool: (config?: ActionConfig) => make_param("b", config),
 		/**
-		 * Creates a SimpleAction descriptor with a number parameter, known to GObject as an int32.
+		 * Creates a SimplerAction descriptor with a number parameter, known to GObject as an int32.
 		 * The range is from MIN_INT32 to MAX_INT32.
 		 *
-		 * @param config Optional parameters for the SimpleAction.
+		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
 		int32: (config?: ActionConfig) => make_param("i", config),
 		/**
-		 * Creates a SimpleAction descriptor with a number parameter, known to GObject as a uint32.
+		 * Creates a SimplerAction descriptor with a number parameter, known to GObject as a uint32.
 		 * The range is from 0 to MAX_UINT32.
 		 *
-		 * @param config Optional parameters for the SimpleAction.
+		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
 		uint32: (config?: ActionConfig) => make_param("u", config),
 		/**
-		 * Creates a SimpleAction descriptor with a number parameter, known to GObject as a double.
+		 * Creates a SimplerAction descriptor with a number parameter, known to GObject as a double.
 		 * The range is from -Number.MAX_VALUE to Number.MAX_VALUE, the same as JS's number.
 		 *
-		 * @param config Optional parameters for the SimpleAction.
+		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
 		double: (config?: ActionConfig) => make_param("d", config),
 		/**
-		 * Creates a SimpleAction descriptor with a parameter of the specified GLibVariant format type.
+		 * Creates a SimplerAction descriptor with a parameter of the specified GLibVariant format type.
 		 * The format for the variant is used to derive the backing variant from incoming TypeScript-native values.
 		 * This allows specifying tuple-like stateful actions via `"(ss)"` being `[string, string]`.
 		 *
 		 * @param format The GLibVariant format string to derive variants and typing from.
-		 * @param config Optional parameters for the SimpleAction.
+		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
 		variant: <const S extends string>(
@@ -309,9 +309,9 @@ const SimpleAction = {
 	 */
 	state: {
 		/**
-		 * Creates a SimpleAction descriptor with a string parameter and state.
+		 * Creates a SimplerAction descriptor with a string parameter and state.
 		 *
-		 * @param config Optional parameters for the SimpleAction.
+		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 * The default state is `""` (empty string) but can be set via the `default` config option.
 		 */
@@ -319,9 +319,9 @@ const SimpleAction = {
 			config?: StateActionConfig<string>,
 		) => make_state("s", config?.default ?? "" as D, config),
 		/**
-		 * Creates a SimpleAction descriptor with a boolean parameter and state.
+		 * Creates a SimplerAction descriptor with a boolean parameter and state.
 		 *
-		 * @param config Optional parameters for the SimpleAction.
+		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 * The default state is false but can be set via the `default` config option.
 		 */
@@ -329,10 +329,10 @@ const SimpleAction = {
 			config?: StateActionConfig<boolean>,
 		) => make_state("b", config?.default ?? false as D, config),
 		/**
-		 * Creates a SimpleAction descriptor with a number parameter and state, known to GObject as an int32.
+		 * Creates a SimplerAction descriptor with a number parameter and state, known to GObject as an int32.
 		 * The range is from MIN_INT32 to MAX_INT32.
 		 *
-		 * @param config Optional parameters for the SimpleAction.
+		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 * The default state is 0 but can be set via the `default` config option.
 		 */
@@ -340,10 +340,10 @@ const SimpleAction = {
 			config?: StateActionConfig<number>,
 		) => make_state("i", config?.default ?? 0 as D, config),
 		/**
-		 * Creates a SimpleAction descriptor with a number parameter and state, known to GObject as a uint32.
+		 * Creates a SimplerAction descriptor with a number parameter and state, known to GObject as a uint32.
 		 * The range is from 0 to MAX_UINT32.
 		 *
-		 * @param config Optional parameters for the SimpleAction.
+		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 * The default state is 0 but can be set via the `default` config option.
 		 */
@@ -351,24 +351,24 @@ const SimpleAction = {
 			config?: StateActionConfig<number>,
 		) => make_state("u", config?.default ?? 0 as D, config),
 		/**
-		 * Creates a SimpleAction descriptor with a number parameter and state, known to GObject as a double.
+		 * Creates a SimplerAction descriptor with a number parameter and state, known to GObject as a double.
 		 * The range is from -Number.MAX_VALUE to Number.MAX_VALUE, the same as JS's number.
 		 * The default state is 0 but can be set via the `default` config option.
 		 *
-		 * @param config Optional parameters for the SimpleAction.
+		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
 		double: <const D extends number>(
 			config?: StateActionConfig<number>,
 		) => make_state("d", config?.default ?? 0 as D, config),
 		/**
-		 * Creates a SimpleAction descriptor with a parameter and state of the specified GLibVariant format type.
+		 * Creates a SimplerAction descriptor with a parameter and state of the specified GLibVariant format type.
 		 * The format for the variant is used to derive the backing variant from incoming TypeScript-native values.
 		 * This allows specifying tuple-like stateful actions via `"(ss)"` being `[string, string]`.
 		 *
 		 * @param format The GLibVariant format string to derive variants and typing from.
 		 * @param default_state The default state of the action.
-		 * @param config Optional parameters for the SimpleAction.
+		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
 		variant: <const S extends string, const T extends HandleActionFormat<S>>(
@@ -390,7 +390,7 @@ const SimpleAction = {
 	 *
 	 * @param field The field on the class which the action will derive from.
 	 * @param transformer
-	 * @param config Optional parameters for the SimpleAction.
+	 * @param config Optional parameters for the SimplerAction.
 	 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 	 *
 	 * @example
@@ -398,7 +398,7 @@ const SimpleAction = {
 	 * @GClass()
 	 * class MyBox extends from(Gtk.Box, {
 	 *     title: Property.string(),
-	 *     title_act: SimpleAction.property("title", (s) => GLib.Variant.new_string(s))
+	 *     title_act: SimplerAction.property("title", (s) => GLib.Variant.new_string(s))
 	 * }) {
 	 *     fn(): void { this.title_act.activate("Hello, World!") }
 	 * }
@@ -431,7 +431,7 @@ const is_action_descriptor = (
 	item: any,
 ): item is ActionDescriptor<any, any, any> => item.action_symbol === ACTION_SYMBOL
 
-export { SimpleAction, is_action_descriptor, resolve_action_prefix, make_static_descriptor }
+export { SimplerAction, is_action_descriptor, resolve_action_prefix, make_static_descriptor }
 export type {
 	ActionDescriptor,
 	TypedAction,

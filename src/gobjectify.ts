@@ -33,7 +33,7 @@ import {
 	type TypedAction,
 	type ActionKind,
 	is_action_descriptor,
-	SimpleAction,
+	SimplerAction,
 	resolve_action_prefix,
 	make_static_descriptor,
 } from "./simple_action.js"
@@ -640,16 +640,16 @@ type CallbackForAction<O, A> = (
 )
 
 /**
- * Decorator that connects a method to a GObjectify SimpleAction event.
+ * Decorator that connects a method to a GObjectify SimplerAction event.
  *
- * When applied to a class method, the `OnSimpleAction(action_name)` ensures that the method
+ * When applied to a class method, the `OnSimplerAction(action_name)` ensures that the method
  * is automatically connected to the given action on the class. The decorated method is bound
  * to the instance, so `this` always refers to the object that captures the action.
  *
- * @param action_name The name of the GObjectify SimpleAction to connect to.
+ * @param action_name The name of the GObjectify SimplerAction to connect to.
  * @returns A decorator for instance methods.
  */
-function OnSimpleAction<
+function OnSimplerAction<
 	T extends GObject.Object,
 	K extends keyof ActionsOf<T, Exclude<ActionKind, "prop">>,
 	U extends CallbackForAction<T, T[K]>,
@@ -961,10 +961,10 @@ export {
 	Notify,
 	WatchProp,
 	OnSignal,
-	OnSimpleAction,
+	OnSimplerAction,
 	PostInit,
 	Property,
 	Child,
-	SimpleAction,
+	SimplerAction,
 	Menu,
 }
