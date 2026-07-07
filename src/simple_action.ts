@@ -33,7 +33,7 @@ type ActionNarrowable<K extends ActionKind, T, Default> = (
 	K extends "param" ? {
 		as<Narrow extends T>(): ActionDescriptor<K, Narrow, Narrow>,
 	} : K extends "state" ? {
-		as<Narrow extends T>(): [Default] extends [Narrow] ? ActionDescriptor<K, Narrow, Default> : [never] & void,
+		as<Narrow extends T>(): [Narrow] extends [Default] ? ActionDescriptor<K, Narrow, Default> : [never] & void,
 	} : {}
 )
 
