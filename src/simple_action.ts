@@ -33,7 +33,7 @@ type ActionNarrowable<K extends ActionKind, T, Default> = (
 	K extends "param" ? {
 		as<Narrow extends T>(): ActionDescriptor<K, Narrow, Narrow>,
 	} : K extends "state" ? {
-		as<Narrow extends T>(): [Narrow] extends [Default] ? ActionDescriptor<K, Narrow, Default> : [never] & void,
+		as<Narrow extends T>(): [Default] extends [Narrow] ? ActionDescriptor<K, Narrow, Default> : [never] & void,
 	} : {}
 )
 
@@ -252,14 +252,14 @@ const SimplerAction = {
 		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
-		string: (config?: ActionConfig) => make_param("s", config),
+		string: (config?: ActionConfig): NarrowableActionDescriptor<"param", string, string> => make_param("s", config),
 		/**
 		 * Creates a SimplerAction descriptor with a boolean parameter.
 		 *
 		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
-		bool: (config?: ActionConfig) => make_param("b", config),
+		bool: (config?: ActionConfig): NarrowableActionDescriptor<"param", boolean, boolean> => make_param("b", config),
 		/**
 		 * Creates a SimplerAction descriptor with a number parameter, known to GObject as an int32.
 		 * The range is from MIN_INT32 to MAX_INT32.
@@ -267,7 +267,7 @@ const SimplerAction = {
 		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
-		int32: (config?: ActionConfig) => make_param("i", config),
+		int32: (config?: ActionConfig): NarrowableActionDescriptor<"param", number, number> => make_param("i", config),
 		/**
 		 * Creates a SimplerAction descriptor with a number parameter, known to GObject as a uint32.
 		 * The range is from 0 to MAX_UINT32.
@@ -275,7 +275,7 @@ const SimplerAction = {
 		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
-		uint32: (config?: ActionConfig) => make_param("u", config),
+		uint32: (config?: ActionConfig): NarrowableActionDescriptor<"param", number, number> => make_param("u", config),
 		/**
 		 * Creates a SimplerAction descriptor with a number parameter, known to GObject as a double.
 		 * The range is from -Number.MAX_VALUE to Number.MAX_VALUE, the same as JS's number.
@@ -283,7 +283,7 @@ const SimplerAction = {
 		 * @param config Optional parameters for the SimplerAction.
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
-		double: (config?: ActionConfig) => make_param("d", config),
+		double: (config?: ActionConfig): NarrowableActionDescriptor<"param", number, number> => make_param("d", config),
 		/**
 		 * Creates a SimplerAction descriptor with a parameter of the specified GLibVariant format type.
 		 * The format for the variant is used to derive the backing variant from incoming TypeScript-native values.
@@ -316,8 +316,8 @@ const SimplerAction = {
 		 * The default state is `""` (empty string) but can be set via the `default` config option.
 		 */
 		string: <const D extends string>(
-			config?: StateActionConfig<string>,
-		) => make_state("s", config?.default ?? "" as D, config),
+			config?: StateActionConfig<D>,
+		): NarrowableActionDescriptor<"state", string, D> => make_state("s", config?.default ?? "" as D, config),
 		/**
 		 * Creates a SimplerAction descriptor with a boolean parameter and state.
 		 *
@@ -326,8 +326,8 @@ const SimplerAction = {
 		 * The default state is false but can be set via the `default` config option.
 		 */
 		bool: <const D extends boolean>(
-			config?: StateActionConfig<boolean>,
-		) => make_state("b", config?.default ?? false as D, config),
+			config?: StateActionConfig<D>,
+		): NarrowableActionDescriptor<"state", boolean, D> => make_state("b", config?.default ?? false as D, config),
 		/**
 		 * Creates a SimplerAction descriptor with a number parameter and state, known to GObject as an int32.
 		 * The range is from MIN_INT32 to MAX_INT32.
@@ -337,8 +337,8 @@ const SimplerAction = {
 		 * The default state is 0 but can be set via the `default` config option.
 		 */
 		int32: <const D extends number>(
-			config?: StateActionConfig<number>,
-		) => make_state("i", config?.default ?? 0 as D, config),
+			config?: StateActionConfig<D>,
+		): NarrowableActionDescriptor<"state", number, D> => make_state("i", config?.default ?? 0 as D, config),
 		/**
 		 * Creates a SimplerAction descriptor with a number parameter and state, known to GObject as a uint32.
 		 * The range is from 0 to MAX_UINT32.
@@ -348,8 +348,8 @@ const SimplerAction = {
 		 * The default state is 0 but can be set via the `default` config option.
 		 */
 		uint32: <const D extends number>(
-			config?: StateActionConfig<number>,
-		) => make_state("u", config?.default ?? 0 as D, config),
+			config?: StateActionConfig<D>,
+		): NarrowableActionDescriptor<"state", number, D> => make_state("u", config?.default ?? 0 as D, config),
 		/**
 		 * Creates a SimplerAction descriptor with a number parameter and state, known to GObject as a double.
 		 * The range is from -Number.MAX_VALUE to Number.MAX_VALUE, the same as JS's number.
@@ -359,8 +359,8 @@ const SimplerAction = {
 		 * Accels can only be used on subclasses of GioApplication and GtkApplicationWindow.
 		 */
 		double: <const D extends number>(
-			config?: StateActionConfig<number>,
-		) => make_state("d", config?.default ?? 0 as D, config),
+			config?: StateActionConfig<D>,
+		): NarrowableActionDescriptor<"state", number, D> => make_state("d", config?.default ?? 0 as D, config),
 		/**
 		 * Creates a SimplerAction descriptor with a parameter and state of the specified GLibVariant format type.
 		 * The format for the variant is used to derive the backing variant from incoming TypeScript-native values.
