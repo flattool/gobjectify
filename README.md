@@ -31,7 +31,7 @@ Here is an example:
 export class MyWidget extends from(Gtk.Box, {
 	title: Property.readwrite.string(),
 	edited: Signal([String]),
-	refresh: SimpleAction(),
+	refresh: SimplerAction.void(),
 	_button: Child<Gtk.Button>(),
 }) {
 	constructor(params?: typeof MyWidget.$params) {
@@ -44,7 +44,7 @@ export class MyWidget extends from(Gtk.Box, {
 		print("Edited to:", contents)
 	}
 
-	@OnSimpleAction("refresh")
+	@OnSimplerAction("refresh")
 	#refresh(): void {
 		print("Refreshing...")
 	}
