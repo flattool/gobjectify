@@ -163,7 +163,8 @@ const make_param = <const S extends string>(
 	as(): any { return this },
 	create(prefix, name): TypedAction<"param", HandleActionFormat<S>> {
 		const action = new Gio.SimpleAction({ name, parameter_type: new GLib.VariantType(this.format) })
-		const instance = Object.assign(Object.create(this), {
+		const instance = Object.create(this)
+		Object.defineProperties(instance, Object.getOwnPropertyDescriptors({
 			action,
 			detailed_name: `${prefix}.${name}`,
 			activate: (param): void => action.activate(new GLib.Variant(this.format, param)),
@@ -172,7 +173,7 @@ const make_param = <const S extends string>(
 			),
 			get enabled(): boolean { return action.get_enabled() },
 			set enabled(v) { action.set_enabled(v) },
-		} satisfies TypedActionBase<"param", HandleActionFormat<S>>)
+		} satisfies TypedActionBase<"param", HandleActionFormat<S>>))
 		return instance
 	},
 })
@@ -193,7 +194,8 @@ const make_state = <const S extends string, const Default extends HandleActionFo
 			parameter_type: new GLib.VariantType(format),
 			state: new GLib.Variant(format, initial_state as any),
 		})
-		const instance = Object.assign(Object.create(this), {
+		const instance = Object.create(this)
+		Object.defineProperties(instance, Object.getOwnPropertyDescriptors({
 			action,
 			detailed_name: `${prefix}.${name}`,
 			activate: (new_state): void => action.activate(new GLib.Variant(format, new_state as any)),
@@ -204,7 +206,7 @@ const make_state = <const S extends string, const Default extends HandleActionFo
 			set enabled(v) { action.set_enabled(v) },
 			get state(): any { return this.action.get_state()!.unpack() },
 			set state(v) { this.action.set_state(new GLib.Variant(format, v)) },
-		} satisfies TypedActionBase<"state", HandleActionFormat<S>>)
+		} satisfies TypedActionBase<"state", HandleActionFormat<S>>))
 		return instance
 	},
 	as(): any { return this },
@@ -228,14 +230,15 @@ const SimplerAction = {
 		initial_state: undefined,
 		create(prefix, name): TypedAction<"void", null> {
 			const action = new Gio.SimpleAction({ name })
-			const instance = Object.assign(Object.create(this), {
+			const instance = Object.create(this)
+			Object.defineProperties(instance, Object.getOwnPropertyDescriptors({
 				action,
 				detailed_name: `${prefix}.${name}`,
 				activate: (): void => action.activate(null),
 				on_activated: (callback): number => action.connect("activate", (_self) => callback(instance)),
 				get enabled(): boolean { return action.get_enabled() },
 				set enabled(v) { action.set_enabled(v) },
-			} satisfies TypedActionBase<"void", null>)
+			} satisfies TypedActionBase<"void", null>))
 			return instance
 		},
 	}),
@@ -416,12 +419,13 @@ const SimplerAction = {
 		transformer: transformer as any,
 		create(prefix, name, object): TypedAction<"prop", any> {
 			const action = new Gio.PropertyAction({ name, object, property_name: field })
-			const instance = Object.assign(Object.create(this), {
+			const instance = Object.create(this)
+			Object.defineProperties(instance, Object.getOwnPropertyDescriptors({
 				action,
 				detailed_name: `${prefix}.${name}`,
 				activate: (item): void => action.activate(transformer(item)),
 				get enabled(): boolean { return action.get_enabled() },
-			} satisfies TypedActionBase<"prop", any>)
+			} satisfies TypedActionBase<"prop", any>))
 			return instance
 		},
 	}),
